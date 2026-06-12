@@ -1,0 +1,9 @@
+root = "0"
+t_bound = "0"
+nullifiers = ["0", "0", "0", "0"]
+commitments = ["0x1366c647aea49724e5270f4873afc67907700288315ba4cacead035b7e16b9af", "0", "0", "0"]
+aux = ["1000000", "0xabcd", "0", "0"]
+owner_x = "0x05"
+amount = "1000000"
+salt = "0x07"
+salt2 = "0x09"

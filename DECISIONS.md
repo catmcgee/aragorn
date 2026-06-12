@@ -92,3 +92,9 @@ require ProveKit's unshipped Solidity export (see D-001) — not available, so n
 everywhere. Gas (~1.5–2M/verify) is irrelevant on local Anvil; honest-narration point for
 the demo ("Groth16 wrap is production roadmap").
 
+### D-011: bb.js proof variant for Solidity verifiers
+2026-06-12. bb-generated Solidity verifiers are the ZK Honk variant; bb.js `{keccak: true}`
+produces the non-ZK proof (length mismatch revert). Correct option:
+`generateProof(witness, { verifierTarget: 'evm' })` (ipaAccumulation:false, keccak oracle,
+ZK enabled). Also: the real Anvil mnemonic key 0 is
+0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80.

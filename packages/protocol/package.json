@@ -1,0 +1,23 @@
+{
+  "name": "@aragorn/protocol",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@aztec/bb.js": "5.0.0-nightly.20260324",
+    "@noble/ciphers": "^2.2.0",
+    "@noble/curves": "^2.2.0",
+    "@noir-lang/noir_js": "1.0.0-beta.21",
+    "bbsign": "npm:@aztec/bb.js@5.0.0-nightly.20260611",
+    "viem": "^2.52.2"
+  },
+  "devDependencies": {
+    "@noble/hashes": "^2.2.0"
+  }
+}
