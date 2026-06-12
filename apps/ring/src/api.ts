@@ -14,6 +14,7 @@ import type { AuthService, Role, SessionUser } from "./auth.ts";
 import type { EnsDirectory } from "./ens.ts";
 import type { Payroll } from "./payroll.ts";
 import type { RepoDesk } from "./repo.ts";
+import type { EarnService } from "./earn.ts";
 import { balances } from "./notes.ts";
 
 type Vars = { Variables: { user: SessionUser } };
@@ -35,6 +36,7 @@ export function buildApi(
   ens: EnsDirectory,
   payroll: Payroll,
   repo: RepoDesk,
+  earn: EarnService,
 ): Hono {
   const app = new Hono();
   app.use("*", cors());
@@ -488,6 +490,49 @@ export function buildApi(
       const result = await repo.close(Number(c.req.param("id")));
       await audit(sql, user.email, "repo_close", { id: c.req.param("id"), ...result });
       chain.emitExternal({ type: "workflow_updated", kind: "repo", id: Number(c.req.param("id")), state: "closed" });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  // ── strategies (B2: Privy Earn, real chain) ───────────────────────────────────────
+  v1.get("/strategies", async (c) => {
+    try {
+      const status = await earn.status();
+      return c.json({
+        earn: status,
+        roadmap: {
+          privateStrategies: {
+            title: "Private strategies",
+            blurb: "Shielded cash into Morpho/Aave/Uniswap with the position itself a private note.",
+            status: "roadmap",
+          },
+        },
+      });
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/strategies/earn/deposit", async (c) => {
+    try {
+      const user = requireRole(c, "admin", "trader");
+      const { amountMicro } = await c.req.json();
+      const result = await earn.deposit(BigInt(amountMicro));
+      await audit(sql, user.email, "earn_deposit", { amountMicro });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/strategies/earn/withdraw", async (c) => {
+    try {
+      const user = requireRole(c, "admin", "trader");
+      const { amountMicro } = await c.req.json();
+      const result = await earn.withdraw(BigInt(amountMicro));
+      await audit(sql, user.email, "earn_withdraw", { amountMicro });
       return c.json(result);
     } catch (e) {
       return onError(c, e);

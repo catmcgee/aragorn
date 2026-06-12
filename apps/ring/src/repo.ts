@@ -502,7 +502,12 @@ export class RepoDesk {
     const rows = await this.sql`
       SELECT resolved_encpubkey FROM ens_whitelist WHERE resolved_partyroot = ${partyXHex} AND status = 'active'`;
     if (rows.length) return Buffer.from(rows[0].resolved_encpubkey.replace("0x", ""), "hex");
-    throw new Error(`no whitelisted org for party ${partyXHex.slice(0, 12)}…`);
+    // departments other than the org's partyroot can't be reverse-mapped from ENS alone;
+    // PoC fallback: with a single whitelisted counterparty the org is unambiguous
+    const all = await this.sql`
+      SELECT resolved_encpubkey FROM ens_whitelist WHERE status = 'active'`;
+    if (all.length === 1) return Buffer.from(all[0].resolved_encpubkey.replace("0x", ""), "hex");
+    throw new Error(`no whitelisted org for party ${partyXHex.slice(0, 12)}… (and ${all.length} candidates)`);
   }
 
   private async findBondIssuer(isinHashHex: string): Promise<Field> {

@@ -77,6 +77,15 @@ export class Flows {
     const [orgPart, party] = spec.includes("::") ? spec.split("::") : [spec, undefined];
     if (orgPart.endsWith(".eth")) {
       if (!this.ens) throw new Error("ENS directory not configured");
+      // department names (dept.org.name.eth, 4+ labels) resolve their party key FROM ENS
+      if (orgPart.split(".").length >= 4) {
+        const dept = await this.ens.resolveDepartment(orgPart);
+        return {
+          x: hexToField(dept.partyKey),
+          encPub: Buffer.from(dept.encPubkey.replace("0x", ""), "hex"),
+          internal: false,
+        };
+      }
       const resolved = await this.ens.lookupWhitelisted(orgPart);
       return {
         x: hexToField(resolved.partyRoot),

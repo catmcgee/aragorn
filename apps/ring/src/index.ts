@@ -12,6 +12,7 @@ import { buildApi } from "./api.ts";
 import { buildGateway } from "./gateway.ts";
 import { Payroll } from "./payroll.ts";
 import { RepoDesk } from "./repo.ts";
+import { EarnService } from "./earn.ts";
 
 const cfg = loadConfig();
 await initPoseidon();
@@ -37,13 +38,19 @@ const auth = new AuthService(
 
 const payroll = new Payroll(sql, chain, flows, encKeys.publicKey);
 const repo = new RepoDesk(sql, chain, flows, ens, encKeys.publicKey, cfg.orgName);
+const earn = new EarnService(
+  cfg.privyAppId,
+  cfg.privyAppSecret,
+  process.env.PRIVY_EARN_WALLET_ID,
+  process.env.PRIVY_EARN_VAULT_ID,
+);
 
 await chain.start();
 
 // maturity cron (BUILD_SPEC §6.3): every 10s
 setInterval(() => void repo.maturityTick().catch(() => {}), 10_000);
 
-const app = buildApi(cfg, sql, chain, flows, auth, ens, payroll, repo);
+const app = buildApi(cfg, sql, chain, flows, auth, ens, payroll, repo, earn);
 if (process.env.GATEWAY_SIGNER_KEY) {
   app.route("/", buildGateway(sql, process.env.GATEWAY_SIGNER_KEY as `0x${string}`, process.env.RING_ENS));
 }

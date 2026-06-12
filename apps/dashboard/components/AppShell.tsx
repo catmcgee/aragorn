@@ -16,6 +16,7 @@ import PublicFeed from "./PublicFeed";
 const NAV: { href: string; label: string; cap: string }[] = [
   { href: "/portfolio", label: "Portfolio", cap: "portfolio" },
   { href: "/transfer", label: "Transfer", cap: "transfer" },
+  { href: "/my-pay", label: "My Pay", cap: "my-pay" },
   { href: "/approvals", label: "Approvals", cap: "approvals" },
   { href: "/admin", label: "Admin", cap: "admin" },
   { href: "/audit", label: "Audit", cap: "audit" },
@@ -80,7 +81,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const ringUrl = getRingUrl() ?? "";
-  const navItems = NAV.filter((n) => me.capabilities.includes(n.cap));
+  const navItems = NAV.filter(
+    (n) =>
+      me.capabilities.includes(n.cap) ||
+      // demo convenience: admins can drive the My Pay flow too
+      (n.cap === "my-pay" && me.user.role === "admin"),
+  );
 
   return (
     <RingContext.Provider

@@ -104,6 +104,7 @@ export async function migrate(sql: Sql): Promise<void> {
       resolved_encpubkey TEXT,
       resolved_endpoint TEXT,
       resolved_partyroot TEXT,
+      resolved_modules TEXT,
       resolved_at TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'active'
     )`;
