@@ -1,0 +1,2 @@
+CREATE DATABASE ring_ubs;
+CREATE DATABASE ring_drw;
