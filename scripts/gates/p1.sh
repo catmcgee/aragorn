@@ -18,7 +18,7 @@ echo "── contracts: forge tests"
 
 echo "── anvil: fresh instance"
 pkill -f "anvil --port 8546" 2>/dev/null || true
-anvil --port 8546 --disable-code-size-limit --silent &
+anvil --port 8546 --disable-code-size-limit --block-time 1 --silent &
 ANVIL_PID=$!
 trap "kill $ANVIL_PID 2>/dev/null || true" EXIT
 sleep 1.5
