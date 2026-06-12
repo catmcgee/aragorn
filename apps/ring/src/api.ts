@@ -54,7 +54,15 @@ export function buildApi(
       const { privyToken } = await c.req.json<{ privyToken: string }>();
       const result = await auth.exchange(privyToken);
       await audit(sql, result.user.email, "login", { role: result.user.role });
-      return c.json(result);
+      return c.json({
+        biscuit: result.biscuit,
+        user: {
+          email: result.user.email,
+          role: result.user.role,
+          actAs: result.user.actAs,
+          limitMicro: result.user.limitMicro?.toString() ?? null,
+        },
+      });
     } catch (e: any) {
       return c.json({ error: e.message }, 401);
     }
@@ -200,11 +208,11 @@ export function buildApi(
   v1.post("/service-tokens", async (c) => {
     try {
       const admin = requireRole(c, "admin");
-      const { actAs, maxNotionalMicro, ttlSeconds } = await c.req.json();
+      const { actAs, maxNotionalMicro, ttlSeconds, role } = await c.req.json();
       const token = auth.mint(
         {
           email: `service:${Date.now()}`,
-          role: "trader",
+          role: (role ?? "trader") as Role,
           actAs: actAs ?? [],
           limitMicro: maxNotionalMicro ? BigInt(maxNotionalMicro) : null,
           service: true,

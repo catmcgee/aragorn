@@ -9,6 +9,7 @@
     "@hono/node-server": "^2.0.4",
     "@privy-io/node": "^0.21.0",
     "hono": "^4.12.25",
+    "jose": "^6.2.3",
     "postgres": "^3.4.9",
     "viem": "^2.52.2"
   }

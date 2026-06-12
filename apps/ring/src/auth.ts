@@ -11,7 +11,7 @@ import {
   authorizer,
   rule,
 } from "@biscuit-auth/biscuit-wasm";
-import { PrivyClient } from "@privy-io/node";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Sql } from "./db.ts";
 
 export type Role = "admin" | "trader" | "approver" | "viewer" | "auditor" | "employee";
@@ -28,36 +28,50 @@ const QUERY_LIMITS = { max_facts: 1000, max_iterations: 100, max_time_micro: 200
 
 export class AuthService {
   readonly root: KeyPair;
-  private privy: PrivyClient | undefined;
+  private jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
   constructor(
     private sql: Sql,
     biscuitRootPriv: string | undefined,
-    privyAppId: string | undefined,
-    privyAppSecret: string | undefined,
+    private privyAppId: string | undefined,
+    private privyAppSecret: string | undefined,
     private emailDomainAllowlist: string[],
   ) {
     this.root = biscuitRootPriv
       ? KeyPair.fromPrivateKey(PrivateKey.fromString(biscuitRootPriv))
       : new KeyPair(SignatureAlgorithm.Ed25519);
-    if (privyAppId && privyAppSecret) {
-      this.privy = new PrivyClient({ appId: privyAppId, appSecret: privyAppSecret });
+    if (privyAppId) {
+      // JWKS verification covers both production and test-mode tokens (the SDK's static
+      // verification key path rejects test tokens — different kid)
+      this.jwks = createRemoteJWKSet(
+        new URL(`https://auth.privy.io/api/v1/apps/${privyAppId}/jwks.json`),
+      );
     }
   }
 
   /** Privy JWT → session Biscuit (1h) carrying the user's entitlement facts. */
   async exchange(privyToken: string): Promise<{ biscuit: string; user: SessionUser }> {
-    if (!this.privy) throw new Error("privy not configured");
-    const claims = await this.privy.utils().auth().verifyAccessToken({ access_token: privyToken });
-    const did: string = (claims as any).sub ?? (claims as any).user_id;
+    if (!this.jwks || !this.privyAppId) throw new Error("privy not configured");
+    const { payload } = await jwtVerify(privyToken, this.jwks, {
+      issuer: "privy.io",
+      audience: this.privyAppId,
+    });
+    const did = payload.sub as string;
 
     let [row] = await this.sql`SELECT * FROM users WHERE privy_did = ${did}`;
     if (!row) {
       // first login: bind the Privy DID to the invited user with this email
-      const privyUser = await this.privy.users().get(did);
+      const res = await fetch(`https://api.privy.io/v1/users/${did}`, {
+        headers: {
+          "privy-app-id": this.privyAppId,
+          authorization: `Basic ${Buffer.from(`${this.privyAppId}:${this.privyAppSecret}`).toString("base64")}`,
+        },
+      });
+      if (!res.ok) throw new Error(`privy user lookup failed (${res.status})`);
+      const privyUser = (await res.json()) as any;
       const email: string | undefined =
-        (privyUser as any)?.linked_accounts?.find((a: any) => a.type === "email")?.address ??
-        (privyUser as any)?.email?.address;
+        privyUser?.linked_accounts?.find((a: any) => a.type === "email")?.address ??
+        privyUser?.email?.address;
       if (!email) throw new Error("privy user has no email");
       const domain = email.split("@")[1];
       if (this.emailDomainAllowlist.length && !this.emailDomainAllowlist.includes(domain)) {
