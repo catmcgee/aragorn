@@ -8,6 +8,10 @@ import { useEffect, useState } from "react";
 import type { ContractRow } from "@aragorn/sdk";
 import { useRing, getStoredToken } from "@/lib/ring";
 import { fmtMicro, shortHex, usdcToMicro } from "@/lib/format";
+import Amount from "@/components/Amount";
+import Term from "@/components/Term";
+import { HashChip } from "@/components/chips";
+import { RoadmapBadge } from "@/components/RoadmapBox";
 
 type RepoStatus =
   | "proposed"
@@ -194,11 +198,21 @@ export default function RepoPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold text-slate-100">Repo</h1>
+      <div>
+        <h1 className="page-title">
+          Repo <Term t="blotter">blotter</Term>
+        </h1>
+        <p className="page-caption">
+          Book bilateral repos against bond collateral — both legs settle as
+          atomic <Term t="DvP" />.
+        </p>
+      </div>
       {error && <p className="err">{error}</p>}
 
       <form className="card max-w-lg space-y-4" onSubmit={book}>
-        <h2 className="section-title">Book repo</h2>
+        <h2 className="section-title">
+          Book repo — <Term t="term sheet" />
+        </h2>
 
         <div>
           <label className="label" htmlFor="collateral">
@@ -218,8 +232,14 @@ export default function RepoPage() {
               ))}
             </select>
           ) : (
-            <p className="text-sm text-slate-500">No unencumbered bond positions.</p>
+            <p className="text-sm text-slate-500">
+              No <Term t="encumbered">unencumbered</Term> bond positions.
+            </p>
           )}
+          <p className="mt-1 text-[11px] text-slate-500">
+            No <Term t="haircut" /> in this demo — collateral pledged at face on
+            the <Term t="on-leg" />.
+          </p>
         </div>
 
         <div>
@@ -262,7 +282,7 @@ export default function RepoPage() {
           </div>
           <div className="w-28">
             <label className="label" htmlFor="rate">
-              Rate (bps)
+              Rate (bps · <Term t="ACT/360" />)
             </label>
             <input
               id="rate"
@@ -310,7 +330,22 @@ export default function RepoPage() {
       </form>
 
       <section className="card">
-        <h2 className="section-title">Blotter</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="section-title mb-0">Blotter</h2>
+          {/* In-page greys on a live module (PLAN §6): visible, disabled, badged. */}
+          <div className="flex items-center gap-2">
+            <button className="btn" disabled>
+              Margin call
+            </button>
+            <button className="btn" disabled>
+              Substitution
+            </button>
+            <button className="btn" disabled>
+              Netting
+            </button>
+            <RoadmapBadge />
+          </div>
+        </div>
         {!repos ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : repos.length === 0 ? (
@@ -323,11 +358,15 @@ export default function RepoPage() {
                 <th className="th">Side</th>
                 <th className="th">Status</th>
                 <th className="th">Counterparty</th>
-                <th className="th">Principal</th>
-                <th className="th">Rate</th>
-                <th className="th">Term</th>
-                <th className="th">Maturity</th>
-                <th className="th">Repurchase</th>
+                <th className="th-num">
+                  <Term t="notional">Principal</Term>
+                </th>
+                <th className="th-num">Rate</th>
+                <th className="th-num">Term</th>
+                <th className="th">
+                  <Term t="off-leg">Off-leg</Term>
+                </th>
+                <th className="th-num">Repurchase</th>
                 <th className="th" />
               </tr>
             </thead>
@@ -348,15 +387,15 @@ export default function RepoPage() {
                   <td className="td font-mono text-xs">
                     {r.state.counterpartyEns ?? "—"}
                   </td>
-                  <td className="td tabular-nums">
-                    {fmtMicro(r.state.cashAmountMicro)}
+                  <td className="td-num">
+                    <Amount micro={r.state.cashAmountMicro} />
                   </td>
-                  <td className="td tabular-nums">
+                  <td className="td-num">
                     {r.state.rateBps !== undefined
                       ? `${r.state.rateBps / 100}%`
                       : "—"}
                   </td>
-                  <td className="td tabular-nums">
+                  <td className="td-num">
                     {r.state.days !== undefined ? `${r.state.days}d` : "—"}
                   </td>
                   <td className="td text-xs">
@@ -364,19 +403,21 @@ export default function RepoPage() {
                       ? new Date(r.state.maturityTs * 1000).toLocaleString()
                       : "—"}
                   </td>
-                  <td className="td tabular-nums">
-                    {r.state.repurchaseMicro
-                      ? fmtMicro(r.state.repurchaseMicro)
-                      : "—"}
+                  <td className="td-num">
+                    {r.state.repurchaseMicro ? (
+                      <Amount micro={r.state.repurchaseMicro} />
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="td">
                     {r.status === "inbound" && (
                       <button
-                        className="btn"
+                        className="btn whitespace-nowrap"
                         disabled={busyId === r.id}
                         onClick={() => accept(r.id)}
                       >
-                        Accept (atomic DvP)
+                        Accept — atomic <Term t="DvP" />
                       </button>
                     )}
                     {r.status === "live" && (

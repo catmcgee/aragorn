@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import type { TransferResult } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { usdcToMicro } from "@/lib/format";
+import Term from "@/components/Term";
+import { HashChip } from "@/components/chips";
+import { ApprovalRing, SettlementRing } from "@/components/rings";
 
 const CUSTOM = "__custom";
 
@@ -54,7 +57,13 @@ export default function TransferPage() {
 
   return (
     <div className="max-w-lg space-y-6">
-      <h1 className="text-lg font-semibold text-slate-100">Transfer</h1>
+      <div>
+        <h1 className="page-title">Transfer</h1>
+        <p className="page-caption">
+          Internal department transfers and Ring-to-Ring payments. Over-limit{" "}
+          <Term t="notional" /> routes to an approver — <Term t="four-eyes" />.
+        </p>
+      </div>
 
       <form className="card space-y-4" onSubmit={submit}>
         <div>
@@ -132,13 +141,16 @@ export default function TransferPage() {
         {error && <p className="err">{error}</p>}
 
         {result?.status === "pending_approval" && (
-          <p className="text-sm text-amber-400">
-            Pending approval #{result.approvalId} — routed to an approver (four-eyes)
+          <p className="flex items-center gap-2 text-sm text-amber-400">
+            <ApprovalRing status="pending" />
+            Pending approval #{result.approvalId} — routed to an approver (
+            <Term t="four-eyes" />)
           </p>
         )}
         {result?.txid && (
-          <p className="text-sm text-emerald-400">
-            Settled — tx <span className="font-mono">{result.txid}</span>
+          <p className="flex items-center gap-2 text-sm text-emerald-400">
+            <SettlementRing state="final" title="final" />
+            Settled — tx <HashChip value={result.txid} />
           </p>
         )}
       </form>

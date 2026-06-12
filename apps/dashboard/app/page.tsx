@@ -8,12 +8,26 @@ import {
   type RingKey,
   getRingKey,
   setRingKey,
-  getStoredToken,
   makeClient,
   storeBiscuit,
   storeDevToken,
 } from "@/lib/ring";
 import { privyConfigured } from "./providers";
+import { BorromeanMark, RingGlyph } from "@/components/rings";
+
+// Each entrance is a ring: UBS wears the gold accent, DRW the silver.
+const RING_STYLE: Record<RingKey, { color: string; idle: string; selected: string }> = {
+  ubs: {
+    color: "#c9a84c",
+    idle: "border-gold/35 hover:border-gold/70",
+    selected: "border-gold bg-gold/[0.07]",
+  },
+  drw: {
+    color: "#aab2bd",
+    idle: "border-silver/30 hover:border-silver/60",
+    selected: "border-silver bg-silver/[0.07]",
+  },
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,27 +72,36 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
-      <h1 className="text-2xl font-semibold text-slate-100">Aragorn</h1>
-      <p className="mb-8 text-sm text-slate-400">Private institutional settlement</p>
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
+      <div className="mb-10 flex flex-col items-center text-center">
+        <BorromeanMark size={64} />
+        <h1 className="mt-6 text-xl font-semibold tracking-[0.45em] text-slate-100">
+          ARAGORN
+        </h1>
+        <p className="mt-2 text-[13px] text-slate-400">
+          Private institutional settlement on public Ethereum
+        </p>
+      </div>
 
-      <div className="card space-y-6">
+      <div className="space-y-6">
         <div>
-          <div className="label">Ring</div>
+          <div className="label">Enter your ring</div>
           <div className="grid grid-cols-2 gap-3">
-            {(Object.keys(RINGS) as RingKey[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => pickRing(k)}
-                className={`rounded-md border px-4 py-6 text-base font-medium ${
-                  ring === k
-                    ? "border-slate-400 bg-slate-700 text-slate-100"
-                    : "border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
-                }`}
-              >
-                {RINGS[k].label}
-              </button>
-            ))}
+            {(Object.keys(RINGS) as RingKey[]).map((k) => {
+              const s = RING_STYLE[k];
+              return (
+                <button
+                  key={k}
+                  onClick={() => pickRing(k)}
+                  className={`flex flex-col items-center gap-2.5 rounded-sm border bg-slate-900/60 px-4 py-6 text-sm font-medium text-slate-200 transition-colors ${
+                    ring === k ? s.selected : s.idle
+                  }`}
+                >
+                  <RingGlyph size={26} color={s.color} />
+                  {RINGS[k].label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -90,28 +113,34 @@ export default function LoginPage() {
           />
         ) : (
           <p className="text-xs text-slate-500">
-            Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID). Use a dev token below.
+            Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID). Use a dev token
+            below.
           </p>
         )}
 
-        <div className="border-t border-slate-800 pt-4">
-          <label className="label" htmlFor="dev-token">
-            Dev token (bypass Privy)
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="dev-token"
-              className="input flex-1"
-              placeholder="e.g. ubs-api-token"
-              value={devToken}
-              onChange={(e) => setDevToken(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && devLogin()}
-            />
-            <button className="btn" disabled={busy} onClick={devLogin}>
-              Use
-            </button>
+        <details className="border-t border-white/8 pt-4">
+          <summary className="cursor-pointer text-[10px] tracking-[0.18em] text-slate-600 uppercase transition-colors hover:text-slate-400">
+            Developer
+          </summary>
+          <div className="mt-3">
+            <label className="label" htmlFor="dev-token">
+              Dev token (bypass Privy)
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="dev-token"
+                className="input flex-1"
+                placeholder="e.g. ubs-api-token"
+                value={devToken}
+                onChange={(e) => setDevToken(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && devLogin()}
+              />
+              <button className="btn" disabled={busy} onClick={devLogin}>
+                Use
+              </button>
+            </div>
           </div>
-        </div>
+        </details>
 
         {error && <p className="err">{error}</p>}
       </div>

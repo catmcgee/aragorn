@@ -131,3 +131,11 @@ signing gateway (employee subnames). Org identity + department/module/auditor me
 v2-natively on aragornrings.eth (D-012 + ens-v2-metadata.ts). Department names
 (treasury.ubs.aragornrings.eth) carry aragorn.partykey and are directly addressable as
 transfer/repo counterparties (flows.resolveRecipient).
+### D-015: ProveKit booth demo (World Track D) — CLI-level PASS
+2026-06-12. spikes/provekit-booth: beta.11 port of entitlement_claim proves via provekit-cli
+1.0.0 (Noir→R1CS→WHIR): prepare 1.10s, prove 0.22s, verify 0.04s, 12,935 constraints (93%
+Poseidon2 permutations), proof 576KB, no trusted setup. Hash compatibility with bb.js
+confirmed bit-for-bit. Soundness: tampered proof rejected; wrong claim_secret unprovable.
+Browser via @atheonxyz/verity BLOCKED upstream: published Verity builds expect PKP format
+minor 2 (ProveKit main); the only crates.io CLI (v1.0.0) writes minor 1. Documented in
+spikes/provekit-booth/REPORT.md. Track qualification: CLI verify is an accepted target env.

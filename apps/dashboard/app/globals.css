@@ -1,31 +1,165 @@
 @import "tailwindcss";
 
+/* ── Aragorn visual identity (PLAN §6.2) ─────────────────────────────────────
+   "Bloomberg terminal calm, not crypto dashboard loud."
+   Graphite/near-black ground, ONE metallic accent (gold), hairline borders,
+   tabular numerals, small-caps section labels. The ring motif carries all
+   playfulness so the rest stays austere. */
+
+@theme {
+  /* Remap the slate scale onto graphite so every existing class re-themes. */
+  --color-slate-950: #0c0e12;
+  --color-slate-900: #11141b;
+  --color-slate-800: #1a1e27;
+  --color-slate-700: #272c38;
+  --color-slate-600: #3b4150;
+  --color-slate-500: #5d6373;
+  --color-slate-400: #8d93a1;
+  --color-slate-300: #b6bac3;
+  --color-slate-200: #d4d6dc;
+  --color-slate-100: #ebecef;
+
+  /* The single metallic accent. */
+  --color-gold: #c9a84c;
+  --color-gold-bright: #e0c06a;
+  --color-gold-dim: #8a7434;
+  --color-silver: #aab2bd;
+
+  --font-sans:
+    "Avenir Next", "Avenir", "Seravek", "Segoe UI", "Helvetica Neue",
+    system-ui, sans-serif;
+  --font-mono:
+    "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono",
+    Menlo, monospace;
+}
+
+body {
+  background-color: var(--color-slate-950);
+  /* A single faint gold bloom at the top of the terminal — atmosphere, not noise. */
+  background-image:
+    radial-gradient(1100px 380px at 50% -120px, rgb(201 168 76 / 0.05), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* All amounts everywhere line up. */
+table {
+  font-variant-numeric: tabular-nums;
+}
+
 @layer components {
   .card {
-    @apply rounded-md border border-slate-800 bg-slate-900 p-4;
+    @apply rounded-sm border border-white/8 bg-slate-900 p-4;
   }
   .btn {
-    @apply rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-sm border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply rounded bg-slate-200 px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-sm border border-gold/60 bg-gold/90 px-3 py-1.5 text-sm font-medium text-slate-950 transition-colors hover:bg-gold-bright disabled:cursor-not-allowed disabled:opacity-40;
   }
   .input {
-    @apply rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-slate-500;
+    @apply rounded-sm border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-gold/50;
   }
   .label {
-    @apply mb-1 block text-xs text-slate-400;
+    @apply mb-1 block text-[10px] tracking-[0.14em] text-slate-500 uppercase;
   }
   .th {
-    @apply border-b border-slate-800 px-3 py-2 text-left text-xs font-medium tracking-wide text-slate-400 uppercase;
+    @apply border-b border-white/8 px-3 py-2 text-left text-[10px] font-medium tracking-[0.14em] text-slate-500 uppercase;
+  }
+  .th-num {
+    @apply border-b border-white/8 px-3 py-2 text-right text-[10px] font-medium tracking-[0.14em] text-slate-500 uppercase;
   }
   .td {
-    @apply border-b border-slate-800/60 px-3 py-2 text-sm;
+    @apply border-b border-white/5 px-3 py-2 text-sm;
+  }
+  .td-num {
+    @apply border-b border-white/5 px-3 py-2 text-right text-sm tabular-nums;
   }
   .err {
     @apply mt-2 text-sm text-red-400;
   }
   .section-title {
-    @apply mb-3 text-sm font-medium text-slate-300;
+    @apply mb-3 text-[11px] font-medium tracking-[0.18em] text-slate-400 uppercase;
   }
+  .page-title {
+    @apply text-lg font-semibold text-slate-100;
+  }
+  .page-caption {
+    @apply mt-1 text-sm text-slate-400;
+  }
+
+  /* Short monospace identifier chip — cids/txids never render as raw hex. */
+  .chip {
+    @apply inline-flex max-w-full items-center gap-1 rounded-[3px] border border-white/10 bg-white/[0.04] px-1.5 py-px text-left font-mono text-[11px] tracking-tight text-slate-300 normal-case;
+  }
+  button.chip {
+    @apply cursor-pointer transition-colors hover:border-gold/40 hover:text-slate-100;
+  }
+
+  /* Gold-outline Roadmap badge — every greyed element wears one. */
+  .badge-roadmap {
+    @apply inline-flex shrink-0 items-center rounded-full border border-gold/50 px-2 py-0.5 text-[9px] font-medium tracking-[0.16em] text-gold uppercase;
+  }
+  .roadmap-box {
+    @apply rounded-sm border border-white/[0.06] bg-white/[0.015] p-4;
+  }
+
+  .status-chip {
+    @apply rounded-full px-2 py-0.5 text-xs;
+  }
+}
+
+/* ── CSS-only hover glossary (PLAN §6: "speak desk, deliberately") ─────────── */
+
+.tip {
+  position: relative;
+}
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  z-index: 60;
+  width: max-content;
+  max-width: 17rem;
+  padding: 6px 9px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 3px;
+  background: #1a1e27;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.55);
+  color: var(--color-slate-200);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 130ms ease,
+    transform 130ms ease;
+}
+.tip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Desk vocabulary: dotted underline, definition on hover. */
+.term {
+  cursor: help;
+  border-bottom: 1px dotted rgb(201 168 76 / 0.55);
+  padding-bottom: 0.5px;
+}
+
+/* In-flight settlement arcs rotate slowly. */
+@keyframes ring-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ring-orbit {
+  animation: ring-orbit 1.8s linear infinite;
+  transform-origin: center;
 }

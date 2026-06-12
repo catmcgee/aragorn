@@ -3,10 +3,11 @@
 // input shape is simplified to (root, nullifier_out, cash_commitment_out) -- the booth
 // demo does not need the on-chain 14-slot layout.
 //
-// Hashing: Poseidon2 (Barretenberg parameters) via the beta.11 stdlib,
-// std::hash::poseidon2::Poseidon2::hash -- matches @aztec/bb.js poseidon2Hash.
+// Hashing: Poseidon2 (Barretenberg parameters) via noir-lang/poseidon v0.1.1
+// (the bundled beta.11 stdlib marks std::hash::poseidon2 private) -- matches
+// @aztec/bb.js poseidon2Hash.
 
-use std::hash::poseidon2::Poseidon2;
+use poseidon::poseidon2::Poseidon2;
 
 global TREE_DEPTH: u32 = 32;
 global VERSION: Field = 1;

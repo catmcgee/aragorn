@@ -79,6 +79,8 @@ export interface RingContextValue {
   ringUrl: string;
   /** Bumped on note_created / note_consumed / approval_* SSE events — refetch on change. */
   tick: number;
+  /** Re-fetch /me (e.g. after toggling modules in Settings → Features). */
+  refreshMe: () => Promise<void>;
   logout: () => void;
 }
 
