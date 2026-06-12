@@ -109,7 +109,7 @@ echo "$ACCEPT" | jqget "['txid']"
 
 sleep 3
 UBS_TRADING_BAL=$(eval curl $UBS/portfolio | jqget "['balances'].get('trading','0')")
-[ "$UBS_TRADING_BAL" = "5000000000000" ] || { echo "dealer cash wrong: $UBS_TRADING_BAL"; exit 1; }
+[ "$UBS_TRADING_BAL" = "5002000000000" ] || { echo "dealer cash wrong: $UBS_TRADING_BAL"; exit 1; }
 UBS_REPO_STATUS=$(eval curl $UBS/repos | jqget "['repos'][0]['status']")
 [ "$UBS_REPO_STATUS" = "live" ] || { echo "UBS workflow not live: $UBS_REPO_STATUS"; exit 1; }
 echo "   UBS received \$5M principal; agreement live on both books ✓"

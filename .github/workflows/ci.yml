@@ -1,0 +1,36 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: install nargo
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+          ~/.nargo/bin/noirup -v 1.0.0-beta.21
+          echo "$HOME/.nargo/bin" >> $GITHUB_PATH
+      - name: install bb
+        run: |
+          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/install | bash
+          ~/.bb/bbup -nv 1.0.0-beta.21
+          echo "$HOME/.bb" >> $GITHUB_PATH
+      - run: bun install
+      - name: circuit tests
+        run: |
+          for c in cash_shield cash_transfer cash_unshield cash_fanout entitlement_claim repo_propose_allocate repo_accept repo_close; do
+            (cd circuits/$c && nargo test --silence-warnings)
+          done
+      - name: protocol tests
+        run: cd packages/protocol && bun test
+      - name: contract tests
+        run: cd contracts && forge test
+      - name: verifier regen diff
+        run: |
+          ./scripts/gen-verifiers.sh
+          git diff --exit-code contracts/src/verifiers/
+      - name: dashboard build
+        run: cd apps/dashboard && bun run build
