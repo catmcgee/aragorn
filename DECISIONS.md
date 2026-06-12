@@ -114,3 +114,20 @@ ENSv2 contracts. We run BOTH paths:
 Key v2 Sepolia addrs: .eth registry 0xDEDB9291…, ETHRegistrar 0x8c2E866B…, VerifiableFactory
 0xD2a632D8…, PermissionedResolver impl 0xdcE5205A…, our resolver proxy 0xC909a297…,
 UniversalResolverV2 0xeEeEEEeE14D…. Scripts: ens-setup.ts (path 1), ens-v2-setup.ts (path 2).
+### D-013: forge-script broadcasting replaced by viem deploy
+2026-06-12. `forge script --broadcast` reproducibly wedges mid-broadcast against local anvil
+in this environment (tx N sent, receipt never observed, 0% CPU, regardless of automine vs
+--block-time). scripts/deploy.ts (viem, handles ZKTranscriptLib linking from out/ artifacts)
+deploys all 24 txs in seconds. Gates + demo-up use it; anvil runs --block-time 1 everywhere
+for extra robustness. Forge remains for build/test only. Also: anvil state snapshots
+(--dump-state) are NOT usable for demo-reset — rings rebuild from EVENTS, which state dumps
+don't carry; demo-reset redeploys + reseeds instead.
+
+### D-014: CCIP + ENS final wiring
+2026-06-12. OffchainResolver (vendored ensdomains pattern, minimal local ECDSA/
+SupportsInterface) deployed on Sepolia, set as resolver for ubs.aragorn-rings.eth (the
+premigration name) → ENSIP-10 wildcard routes *.ubs.aragorn-rings.eth to the UBS Ring's
+signing gateway (employee subnames). Org identity + department/module/auditor metadata live
+v2-natively on aragornrings.eth (D-012 + ens-v2-metadata.ts). Department names
+(treasury.ubs.aragornrings.eth) carry aragorn.partykey and are directly addressable as
+transfer/repo counterparties (flows.resolveRecipient).
