@@ -21,8 +21,8 @@ import {
   type Field,
   type OrgEncKeys,
 } from "@aragorn/protocol";
-import type { RingConfig } from "./config.js";
-import type { Sql } from "./db.js";
+import type { RingConfig } from "./config.ts";
+import type { Sql } from "./db.ts";
 
 const LEAF_EVENT = parseAbiItem(
   "event LeafInserted(uint32 indexed index, bytes32 commitment, bytes32 newRoot)",
@@ -65,6 +65,11 @@ export class ChainSync {
 
   private emit(e: RingEvent) {
     for (const fn of this.listeners) fn(e);
+  }
+
+  /** For non-chain events that belong on the same SSE stream (approvals, workflows). */
+  emitExternal(e: RingEvent): void {
+    this.emit(e);
   }
 
   /** Rebuild the in-memory tree from the projection, then start tailing. */

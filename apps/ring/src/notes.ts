@@ -1,7 +1,7 @@
 // Note manager (BUILD_SPEC §6.3): coin selection (largest-first), pending_consume locking,
 // contention release. Institutions never see any of this — the API speaks contracts.
 import { hexToField, type Field } from "@aragorn/protocol";
-import type { Sql } from "./db.js";
+import type { Sql } from "./db.ts";
 
 export interface SelectedNote {
   cid: string;

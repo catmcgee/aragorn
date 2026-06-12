@@ -62,7 +62,7 @@ RING_ORG_NAME=UBS PORT=4001 \
   PARTY_KEYS='{"treasury":"0x111","trading":"0x112"}' \
   FUNDING_EOA_PRIVATE_KEY=$UBS_FUND_KEY \
   DIRECTORY="$DIRECTORY" \
-  bun apps/ring/src/index.ts &
+  node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts &
 
 RING_ORG_NAME=DRW PORT=4002 \
   DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_drw \
@@ -72,7 +72,7 @@ RING_ORG_NAME=DRW PORT=4002 \
   PARTY_KEYS='{"desk":"0x221"}' \
   FUNDING_EOA_PRIVATE_KEY=$DRW_FUND_KEY \
   DIRECTORY="$DIRECTORY" \
-  bun apps/ring/src/index.ts &
+  node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts &
 
 for port in 4900 4001 4002; do
   for i in $(seq 1 40); do

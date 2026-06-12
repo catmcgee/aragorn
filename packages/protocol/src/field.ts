@@ -1,4 +1,4 @@
-import { FIELD_MODULUS } from "./constants.js";
+import { FIELD_MODULUS } from "./constants.ts";
 
 export type Field = bigint;
 

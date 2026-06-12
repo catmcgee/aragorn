@@ -4,9 +4,9 @@
 import { x25519 } from "@noble/curves/ed25519.js";
 import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { VIEW_TAG_BYTES, VIEW_TAG_DOMAIN, type TemplateId } from "./constants.js";
-import type { Note } from "./note.js";
-import { type Field, fieldToHex, hexToField } from "./field.js";
+import { VIEW_TAG_BYTES, VIEW_TAG_DOMAIN, type TemplateId } from "./constants.ts";
+import type { Note } from "./note.ts";
+import { type Field, fieldToHex, hexToField } from "./field.ts";
 
 export interface OrgEncKeys {
   publicKey: Uint8Array; // 32

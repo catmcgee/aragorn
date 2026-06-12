@@ -4,9 +4,9 @@ import {
   PAYLOAD_FIELDS,
   PROTOCOL_VERSION,
   type TemplateId,
-} from "./constants.js";
-import { type Field, assertField, fieldToHex, packBytesToFields, randomField } from "./field.js";
-import { poseidon2 } from "./poseidon.js";
+} from "./constants.ts";
+import { type Field, assertField, fieldToHex, packBytesToFields, randomField } from "./field.ts";
+import { poseidon2 } from "./poseidon.ts";
 
 export type PayloadFields = Record<string, Field>;
 

@@ -22,10 +22,11 @@ import {
   type Note,
   type PartyKeys,
 } from "@aragorn/protocol";
-import type { RingConfig } from "./config.js";
-import type { ChainSync } from "./chain.js";
-import { releaseNotes, selectCash, type SelectedNote } from "./notes.js";
-import type { Sql } from "./db.js";
+import type { RingConfig } from "./config.ts";
+import type { ChainSync } from "./chain.ts";
+import type { EnsDirectory } from "./ens.ts";
+import { releaseNotes, selectCash, type SelectedNote } from "./notes.ts";
+import type { Sql } from "./db.ts";
 
 const CIRCUITS_DIR = process.env.CIRCUITS_DIR ?? "circuits";
 const artifacts = new Map<string, any>();
@@ -51,6 +52,7 @@ export class Flows {
     private sql: Sql,
     private chain: ChainSync,
     private orgEncPub: Uint8Array,
+    private ens?: EnsDirectory,
   ) {
     for (const [label, priv] of Object.entries(cfg.partyKeys)) {
       this.parties[label] = derivePartyKeys(priv);
@@ -69,16 +71,27 @@ export class Flows {
     );
   }
 
-  /** Resolve "ORG::party" → recipient pubkey x + org encryption key. */
-  resolveRecipient(spec: string): { x: Field; encPub: Uint8Array; internal: boolean } {
-    const [org, party] = spec.split("::");
-    if (!org || !party) throw new Error(`recipient must be ORG::party, got ${spec}`);
+  /** Resolve a recipient: "party" / "ORG::party" (internal/static directory) or an ENS
+   *  name like "drw.aragorn-rings.eth" (whitelist-gated; party = the org's partyroot). */
+  async resolveRecipient(spec: string): Promise<{ x: Field; encPub: Uint8Array; internal: boolean }> {
+    const [orgPart, party] = spec.includes("::") ? spec.split("::") : [spec, undefined];
+    if (orgPart.endsWith(".eth")) {
+      if (!this.ens) throw new Error("ENS directory not configured");
+      const resolved = await this.ens.lookupWhitelisted(orgPart);
+      return {
+        x: hexToField(resolved.partyRoot),
+        encPub: Buffer.from(resolved.encPubkey.replace("0x", ""), "hex"),
+        internal: false,
+      };
+    }
+    const org = party === undefined ? this.cfg.orgName : orgPart;
+    const label = party ?? orgPart;
     if (org === this.cfg.orgName) {
-      return { x: this.party(party).x, encPub: this.orgEncPub, internal: true };
+      return { x: this.party(label).x, encPub: this.orgEncPub, internal: true };
     }
     const entry = this.cfg.directory[org];
     if (!entry) throw new Error(`unknown counterparty org ${org} (not in directory)`);
-    const partyX = entry.parties[party];
+    const partyX = entry.parties[label];
     if (!partyX) throw new Error(`unknown party ${spec}`);
     return {
       x: hexToField(partyX),
@@ -150,7 +163,7 @@ export class Flows {
     amount: bigint,
   ): Promise<{ txid: string; cid: string }> {
     const owner = this.party(fromParty);
-    const recipient = this.resolveRecipient(toSpec);
+    const recipient = await this.resolveRecipient(toSpec);
     const inputs = await selectCash(this.sql, fromParty, amount);
     try {
       return await this.transferInner(owner, recipient, inputs, amount);

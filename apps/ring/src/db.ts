@@ -91,6 +91,7 @@ export async function migrate(sql: Sql): Promise<void> {
       ens_name TEXT PRIMARY KEY,
       resolved_encpubkey TEXT,
       resolved_endpoint TEXT,
+      resolved_partyroot TEXT,
       resolved_at TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'active'
     )`;

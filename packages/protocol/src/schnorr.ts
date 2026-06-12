@@ -2,8 +2,8 @@
 // Signing uses the bbsign alias (bb.js nightly ≥ 20260519); the circuit verifies via
 // noir-lang/schnorr v0.4.0. Signed message: msg = Poseidon2([root, nullifiers..., commitments...]).
 import { BackendType, BarretenbergSync as SignApi } from "bbsign";
-import { type Field, fieldToU8, u8ToField } from "./field.js";
-import { poseidon2 } from "./poseidon.js";
+import { type Field, fieldToU8, u8ToField } from "./field.ts";
+import { poseidon2 } from "./poseidon.ts";
 
 let api: Awaited<ReturnType<typeof SignApi.initSingleton>> | undefined;
 

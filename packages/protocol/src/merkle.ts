@@ -1,8 +1,8 @@
 // Client-side mirror of NoteRegistry's incremental Poseidon2 Merkle tree (depth 32).
 // Used for witness generation (paths) and root checking; rebuilt from chain events.
-import { TREE_DEPTH } from "./constants.js";
-import type { Field } from "./field.js";
-import { poseidon2 } from "./poseidon.js";
+import { TREE_DEPTH } from "./constants.ts";
+import type { Field } from "./field.ts";
+import { poseidon2 } from "./poseidon.ts";
 
 export class MerkleTree {
   readonly depth = TREE_DEPTH;

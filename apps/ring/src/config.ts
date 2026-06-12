@@ -26,6 +26,12 @@ export interface RingConfig {
   fundingEoaKey: `0x${string}`;
   /** static directory for P2; replaced by ENS resolution in P3 */
   directory: Record<string, DirectoryEntry>;
+  privyAppId?: string;
+  privyAppSecret?: string;
+  biscuitRootPriv?: string;
+  emailDomainAllowlist: string[];
+  sepoliaRpcUrl?: string;
+  enabledModules: string[];
 }
 
 function req(name: string): string {
@@ -54,5 +60,17 @@ export function loadConfig(): RingConfig {
     partyKeys,
     fundingEoaKey: req("FUNDING_EOA_PRIVATE_KEY") as `0x${string}`,
     directory: JSON.parse(process.env.DIRECTORY ?? "{}"),
+    privyAppId: process.env.PRIVY_APP_ID,
+    privyAppSecret: process.env.PRIVY_APP_SECRET,
+    biscuitRootPriv: process.env.BISCUIT_ROOT_PRIV,
+    emailDomainAllowlist: (process.env.EMAIL_DOMAIN_ALLOWLIST ?? "")
+      .split(",")
+      .map((d) => d.trim())
+      .filter(Boolean),
+    sepoliaRpcUrl: process.env.SEPOLIA_RPC_URL,
+    enabledModules: (process.env.ENABLED_MODULES ?? "payments,repo,payroll,issuance,strategies")
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean),
   };
 }

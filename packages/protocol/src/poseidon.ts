@@ -1,7 +1,7 @@
 // Poseidon2 with Barretenberg parameters — the ONLY hash in the protocol (D-002).
 // MUST be bb.js's implementation; never a third-party Poseidon (parameter mismatch burn).
 import { BarretenbergSync } from "@aztec/bb.js";
-import { type Field, fieldToU8, u8ToField } from "./field.js";
+import { type Field, fieldToU8, u8ToField } from "./field.ts";
 
 let api: Awaited<ReturnType<typeof BarretenbergSync.initSingleton>> | undefined;
 

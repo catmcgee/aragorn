@@ -1,6 +1,6 @@
 // settle() ABI & public input layout (§3.8).
-import { PUBLIC_INPUT_COUNT, type CircuitId } from "./constants.js";
-import { type Field, fieldToHex } from "./field.js";
+import { PUBLIC_INPUT_COUNT, type CircuitId } from "./constants.ts";
+import { type Field, fieldToHex } from "./field.ts";
 
 export interface SettleInputs {
   root: Field;
