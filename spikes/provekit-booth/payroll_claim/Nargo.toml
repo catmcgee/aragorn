@@ -1,0 +1,6 @@
+[package]
+name = "payroll_claim"
+type = "bin"
+compiler_version = ">=0.36.0"
+
+[dependencies]
