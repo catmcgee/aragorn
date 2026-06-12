@@ -1,0 +1,7 @@
+pub_key_x = "0x2d77163ddebda983bf5266bf8bef29aac6a7393ad10ad8b563104520dd4efef3"
+pub_key_y = "0x11e36587169a6552b3fce67fabc2f45c1e9481f590fdc04565a4a060cc18c667"
+sig_s_lo = "0x3b9146bacfc346e37e395a53c96c93a3"
+sig_s_hi = "0x2fd78658b3a3c620f2285f92a54ea12d"
+sig_e_lo = "0x689e6006c84f372bb187a4379b8232e7"
+sig_e_hi = "0x19930ebf95fffb98c04a91bdb0182703"
+message = "0x07"

@@ -1,0 +1,7 @@
+[package]
+name = "schnorr_spike"
+type = "bin"
+authors = [""]
+
+[dependencies]
+schnorr = { tag = "v0.4.0", git = "https://github.com/noir-lang/schnorr" }
