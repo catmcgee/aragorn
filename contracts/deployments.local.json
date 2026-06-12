@@ -1,6 +1,6 @@
 {
-  "poseidon": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-  "registry": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-  "usdc": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-  "vault": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
+  "poseidon": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+  "usdc": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+  "vault": "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+  "registry": "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9"
 }

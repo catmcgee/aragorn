@@ -2,7 +2,21 @@
 
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+library ECDSA {
+    function recover(bytes32 hash, bytes memory signature) internal pure returns (address) {
+        require(signature.length == 65, "ECDSA: bad sig length");
+        bytes32 r; bytes32 s_; uint8 v;
+        assembly {
+            r := mload(add(signature, 0x20))
+            s_ := mload(add(signature, 0x40))
+            v := byte(0, mload(add(signature, 0x60)))
+        }
+        if (v < 27) v += 27;
+        address signer = ecrecover(hash, v, r, s_);
+        require(signer != address(0), "ECDSA: invalid sig");
+        return signer;
+    }
+}
 
 library SignatureVerifier {
     /**

@@ -103,13 +103,6 @@ export function buildApi(
   // ── session & org ─────────────────────────────────────────────────────────────────
   v1.get("/me", async (c) => {
     const user = c.get("user");
-    const enabledModules = cfg.enabledModules ?? [
-      "payments",
-      "repo",
-      "payroll",
-      "issuance",
-      "strategies",
-    ];
     return c.json({
       user: { email: user.email, role: user.role, actAs: user.actAs },
       limitMicro: user.limitMicro?.toString() ?? null,
@@ -118,6 +111,46 @@ export function buildApi(
       enabledModules,
       capabilities: capabilitiesFor(user.role),
     });
+  });
+
+  // ── settings: module model (PLAN §6) ──────────────────────────────────────────────
+  const MODULE_CATALOG: { key: string; status: "live" | "partial" | "roadmap" }[] = [
+    { key: "payments", status: "live" },
+    { key: "repo", status: "live" },
+    { key: "payroll", status: "live" },
+    { key: "issuance", status: "partial" },
+    { key: "strategies", status: "live" },
+    { key: "lending", status: "roadmap" },
+    { key: "fx", status: "roadmap" },
+    { key: "compliance", status: "roadmap" },
+    { key: "reports", status: "roadmap" },
+  ];
+  let enabledModules = [...cfg.enabledModules];
+
+  v1.get("/settings/modules", async (c) => {
+    try {
+      requireRole(c, "admin");
+      return c.json({
+        modules: MODULE_CATALOG.map((m) => ({ ...m, enabled: enabledModules.includes(m.key) })),
+      });
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.put("/settings/modules", async (c) => {
+    try {
+      const admin = requireRole(c, "admin");
+      const { module, enabled } = await c.req.json();
+      if (!MODULE_CATALOG.some((m) => m.key === module)) return c.json({ error: "unknown module" }, 400);
+      enabledModules = enabled
+        ? [...new Set([...enabledModules, module])]
+        : enabledModules.filter((m) => m !== module);
+      await audit(sql, admin.email, "module_toggle", { module, enabled });
+      return c.json({ enabledModules });
+    } catch (e) {
+      return onError(c, e);
+    }
   });
 
   // ── admin: users, whitelist, service tokens ───────────────────────────────────────

@@ -24,9 +24,7 @@ trap "kill $ANVIL_PID 2>/dev/null || true" EXIT
 sleep 1.5
 
 echo "── deploy"
-(cd contracts && forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8546 \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --broadcast --code-size-limit 1000000 > /dev/null)
+RPC_URL=$RPC bun scripts/deploy.ts > /dev/null
 
 echo "── round-trip (proving three circuits, ~30s)"
 RPC_URL=http://127.0.0.1:8546 bun scripts/p1-roundtrip.ts

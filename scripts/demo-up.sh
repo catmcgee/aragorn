@@ -30,9 +30,7 @@ echo "── anvil + contracts"
 anvil --port 8546 --disable-code-size-limit --block-time 1 --silent &
 echo $! >> $PIDFILE
 sleep 1.5
-(cd contracts && forge script script/Deploy.s.sol --rpc-url $RPC \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --broadcast --code-size-limit 1000000 > /dev/null)
+RPC_URL=$RPC bun scripts/deploy.ts > /dev/null
 
 REGISTRY=$(python3 -c "import json; print(json.load(open('contracts/deployments.local.json'))['registry'])")
 VAULT=$(python3 -c "import json; print(json.load(open('contracts/deployments.local.json'))['vault'])")
