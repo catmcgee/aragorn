@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # P3 gate: Privy login → Biscuit exchange; invite/roles; whitelist resolves
-# drw.aragorn-rings.eth from Sepolia; CCIP gateway resolves cat.ubs.aragorn-rings.eth;
+# drw.aragornrings.eth from Sepolia; CCIP gateway resolves cat.ubs.aragornrings.eth;
 # dashboard shell boots; I3 four-eyes transfer end-to-end via the API.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -44,7 +44,7 @@ RPC_URL=$RPC PORT=4900 bun apps/coordinator/src/index.ts &
 
 COMMON_RING_ENV="RPC_URL=$RPC NOTE_REGISTRY_ADDR=$REGISTRY USDC_ADDR=$USDC SHIELD_VAULT_ADDR=$VAULT RELAYER_URL=http://127.0.0.1:4900"
 
-RING_ORG_NAME=UBS PORT=4001 RING_ENS=ubs.aragorn-rings.eth \
+RING_ORG_NAME=UBS PORT=4001 RING_ENS=ubs.aragornrings.eth \
   DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_ubs \
   RPC_URL=$RPC NOTE_REGISTRY_ADDR=$REGISTRY USDC_ADDR=$USDC SHIELD_VAULT_ADDR=$VAULT \
   RELAYER_URL=http://127.0.0.1:4900 RELAYER_TOKEN=ubs-relay-token API_TOKEN=ubs-api-token \
@@ -58,7 +58,7 @@ RING_ORG_NAME=UBS PORT=4001 RING_ENS=ubs.aragorn-rings.eth \
   DIRECTORY="$DIRECTORY" \
   node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts &
 
-RING_ORG_NAME=DRW PORT=4002 RING_ENS=drw.aragorn-rings.eth \
+RING_ORG_NAME=DRW PORT=4002 RING_ENS=drw.aragornrings.eth \
   DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_drw \
   RPC_URL=$RPC NOTE_REGISTRY_ADDR=$REGISTRY USDC_ADDR=$USDC SHIELD_VAULT_ADDR=$VAULT \
   RELAYER_URL=http://127.0.0.1:4900 RELAYER_TOKEN=drw-relay-token API_TOKEN=drw-api-token \
@@ -102,13 +102,13 @@ JANE_ME=$(curl -s -H "authorization: Bearer $JANE" http://127.0.0.1:4001/v1/me |
 [ "$JANE_ME" = "trader" ] || { echo "biscuit verify failed"; exit 1; }
 echo "   jane session verified as trader ✓"
 
-echo "── whitelist: drw.aragorn-rings.eth resolves live from Sepolia"
+echo "── whitelist: drw.aragornrings.eth resolves live from Sepolia"
 ENC=$(eval curl -X POST $UBS/whitelist -H "'content-type: application/json'" \
-  -d "'{\"ensName\":\"drw.aragorn-rings.eth\"}'" | jqget "['encPubkey']")
+  -d "'{\"ensName\":\"drw.aragornrings.eth\"}'" | jqget "['encPubkey']")
 [ "$ENC" = "0x0faa684ed28867b97f4a6a2dee5df8ce974e76b7018e3f22a1c4cf2678570f20" ] || { echo "ENS resolution wrong: $ENC"; exit 1; }
 echo "   resolved encpubkey ✓"
 
-echo "── employee + CCIP gateway: cat.ubs.aragorn-rings.eth"
+echo "── employee + CCIP gateway: cat.ubs.aragornrings.eth"
 eval curl -X POST $UBS/employees -H "'content-type: application/json'" \
   -d "'{\"subnameLabel\":\"cat\"}'" | jqget "['employee']['subname_label']"
 bun scripts/p3-ccip-check.ts
@@ -119,7 +119,7 @@ eval curl -X POST $UBS/shield -H "'content-type: application/json'" \
 
 echo "── four-eyes: jane books a \$50 transfer (over her \$20 limit)"
 PENDING=$(curl -s -X POST -H "authorization: Bearer $JANE" -H "content-type: application/json" \
-  -d '{"fromParty":"treasury","toPartyOrEns":"drw.aragorn-rings.eth","amountMicro":"50000000"}' \
+  -d '{"fromParty":"treasury","toPartyOrEns":"drw.aragornrings.eth","amountMicro":"50000000"}' \
   http://127.0.0.1:4001/v1/transfers)
 APPROVAL_ID=$(echo "$PENDING" | jqget "['approvalId']")
 STATUS=$(echo "$PENDING" | jqget "['status']")

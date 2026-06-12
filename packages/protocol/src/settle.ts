@@ -61,7 +61,10 @@ export const NOTE_REGISTRY_ABI = [
     type: "function",
     name: "seedCommitments",
     stateMutability: "nonpayable",
-    inputs: [{ name: "commitments", type: "bytes32[]" }],
+    inputs: [
+      { name: "commitments", type: "bytes32[]" },
+      { name: "ciphertexts", type: "bytes[]" },
+    ],
     outputs: [],
   },
   {

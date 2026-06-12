@@ -81,3 +81,87 @@ pub fn transition_msg_2x2(root: Field, n1: Field, n2: Field, c1: Field, c2: Fiel
 pub fn transition_msg_1x1(root: Field, n1: Field, c1: Field) -> Field {
     Poseidon2::hash([root, n1, c1], 3)
 }
+
+// -- P4 template payloads (S3.6 field orders) ------------------------------------
+
+/// Entitlement payload: [claim_hash, amount, payer_x, memo_hash]
+pub fn entitlement_payload(claim_hash: Field, amount: u64, payer_x: Field, memo_hash: Field) -> Field {
+    Poseidon2::hash([claim_hash, amount as Field, payer_x, memo_hash], 4)
+}
+
+/// BondPosition payload: [owner_x, issuer_x, isin_hash, face_amount, encumbrance]
+pub fn bond_payload(owner_x: Field, issuer_x: Field, isin_hash: Field, face_amount: u64, encumbrance: Field) -> Field {
+    Poseidon2::hash([owner_x, issuer_x, isin_hash, face_amount as Field, encumbrance], 5)
+}
+
+/// RepoProposal payload: [dealer_x, lender_x, isin_hash, face_amount, cash_amount, rate_bps, days]
+pub fn repo_proposal_payload(
+    dealer_x: Field,
+    lender_x: Field,
+    isin_hash: Field,
+    face_amount: u64,
+    cash_amount: u64,
+    rate_bps: u64,
+    days: u64,
+) -> Field {
+    Poseidon2::hash(
+        [dealer_x, lender_x, isin_hash, face_amount as Field, cash_amount as Field, rate_bps as Field, days as Field],
+        7,
+    )
+}
+
+/// CollateralAllocation payload: [dealer_x, proposal_c, isin_hash, face_amount]
+pub fn collateral_allocation_payload(dealer_x: Field, proposal_c: Field, isin_hash: Field, face_amount: u64) -> Field {
+    Poseidon2::hash([dealer_x, proposal_c, isin_hash, face_amount as Field], 4)
+}
+
+/// RepoAgreement payload: [dealer_x, lender_x, collateral_c, cash_amount, rate_bps, days, maturity_ts]
+pub fn repo_agreement_payload(
+    dealer_x: Field,
+    lender_x: Field,
+    collateral_c: Field,
+    cash_amount: u64,
+    rate_bps: u64,
+    days: u64,
+    maturity_ts: u64,
+) -> Field {
+    Poseidon2::hash(
+        [dealer_x, lender_x, collateral_c, cash_amount as Field, rate_bps as Field, days as Field, maturity_ts as Field],
+        7,
+    )
+}
+
+/// Two-party stakeholder hash: prover supplies the sorted pair; the circuit enforces SET
+/// equality (either order). Counterparties recompute the canonical sorted commitment at
+/// sync, so a maliciously swapped order simply fails discovery.
+pub fn two_party_stakeholders(sh_lo: Field, sh_hi: Field, a: Field, b: Field) -> Field {
+    let straight = (sh_lo == a) & (sh_hi == b);
+    let swapped = (sh_lo == b) & (sh_hi == a);
+    assert(straight | swapped);
+    Poseidon2::hash([sh_lo, sh_hi, 0, 0], 4)
+}
+
+/// Repo interest (S3.5, integer math, ACT/360):
+/// repurchase = P + (P * rate_bps * days) / (10_000 * 360), floor division.
+pub fn repurchase_amount(principal: u64, rate_bps: u64, days: u64) -> u64 {
+    let p = principal as u128;
+    let interest = (p * (rate_bps as u128) * (days as u128)) / 3_600_000;
+    principal + (interest as u64)
+}
+
+// transition messages at the remaining circuit arities
+pub fn transition_msg_1x4(root: Field, n1: Field, c: [Field; 4]) -> Field {
+    Poseidon2::hash([root, n1, c[0], c[1], c[2], c[3]], 6)
+}
+
+pub fn transition_msg_1x2(root: Field, n1: Field, c1: Field, c2: Field) -> Field {
+    Poseidon2::hash([root, n1, c1, c2], 4)
+}
+
+pub fn transition_msg_4x4(root: Field, n: [Field; 4], c: [Field; 4]) -> Field {
+    Poseidon2::hash([root, n[0], n[1], n[2], n[3], c[0], c[1], c[2], c[3]], 9)
+}
+
+pub fn transition_msg_4x3(root: Field, n: [Field; 4], c1: Field, c2: Field, c3: Field) -> Field {
+    Poseidon2::hash([root, n[0], n[1], n[2], n[3], c1, c2, c3], 8)
+}

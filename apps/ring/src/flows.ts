@@ -100,7 +100,7 @@ export class Flows {
     };
   }
 
-  private async settle(
+  async settleRaw(
     circuitId: number,
     bundle: { proof: Uint8Array; publicInputs: string[] },
     ciphertexts: Uint8Array[],
@@ -152,7 +152,7 @@ export class Flows {
         salt2: fieldToHex(note.fields.salt2),
       }),
     );
-    const txid = await this.settle(CircuitId.cash_shield, bundle, encryptNoteFor([this.orgEncPub], note));
+    const txid = await this.settleRaw(CircuitId.cash_shield, bundle, encryptNoteFor([this.orgEncPub], note));
     return { txid, cid: fieldToHex(c) };
   }
 
@@ -238,7 +238,7 @@ export class Flows {
       ...encryptNoteFor([recipient.encPub], outNote),
       ...encryptNoteFor([this.orgEncPub], changeNote),
     ];
-    const txid = await this.settle(CircuitId.cash_transfer, bundle, cts);
+    const txid = await this.settleRaw(CircuitId.cash_transfer, bundle, cts);
     return { txid, cid: fieldToHex(c1) };
   }
 
@@ -290,7 +290,7 @@ export class Flows {
           change_salt2: fieldToHex(changeNote.fields.salt2),
         }),
       );
-      const txid = await this.settle(
+      const txid = await this.settleRaw(
         CircuitId.cash_unshield,
         bundle,
         encryptNoteFor([this.orgEncPub], changeNote),

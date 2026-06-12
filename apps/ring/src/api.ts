@@ -12,6 +12,8 @@ import type { ChainSync } from "./chain.ts";
 import type { Flows } from "./flows.ts";
 import type { AuthService, Role, SessionUser } from "./auth.ts";
 import type { EnsDirectory } from "./ens.ts";
+import type { Payroll } from "./payroll.ts";
+import type { RepoDesk } from "./repo.ts";
 import { balances } from "./notes.ts";
 
 type Vars = { Variables: { user: SessionUser } };
@@ -31,6 +33,8 @@ export function buildApi(
   flows: Flows,
   auth: AuthService,
   ens: EnsDirectory,
+  payroll: Payroll,
+  repo: RepoDesk,
 ): Hono {
   const app = new Hono();
   app.use("*", cors());
@@ -359,6 +363,131 @@ export function buildApi(
       const { party, amountMicro, recipient } = await c.req.json();
       const result = await flows.unshield(party, BigInt(amountMicro), recipient);
       await audit(sql, user.email, "unshield", { party, amountMicro, recipient, ...result });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  // ── payroll (I6) ──────────────────────────────────────────────────────────────────
+  v1.post("/payroll/run", async (c) => {
+    try {
+      const user = requireRole(c, "admin", "trader");
+      const { payerParty, payments } = await c.req.json();
+      const result = await payroll.run(
+        payerParty ?? "treasury",
+        payments.map((p: any) => ({ employeeId: p.employeeId, amountMicro: BigInt(p.amountMicro) })),
+        user.email,
+      );
+      await audit(sql, user.email, "payroll_run", { payments, ...result });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.get("/payroll/items", async (c) => {
+    try {
+      requireRole(c, "admin", "trader");
+      const rows = await sql`
+        SELECT p.id, p.employee_id, p.amount_micro, p.status, p.entitlement_cid, e.subname_label
+        FROM payroll_items p JOIN employees e ON e.id = p.employee_id ORDER BY p.id DESC LIMIT 50`;
+      return c.json({ items: rows });
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/payroll/claim-data", async (c) => {
+    try {
+      const { employeeId } = await c.req.json();
+      return c.json(await payroll.claimData(Number(employeeId)));
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/payroll/claim", async (c) => {
+    try {
+      const { employeeId } = await c.req.json();
+      const result = await payroll.claim(Number(employeeId));
+      await audit(sql, (c.get("user") as SessionUser).email, "payroll_claim", { employeeId, ...result });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/payroll/submit-claim", async (c) => {
+    try {
+      const { proof, publicInputs } = await c.req.json();
+      const result = await payroll.submitClaim(proof, publicInputs);
+      await audit(sql, (c.get("user") as SessionUser).email, "payroll_submit_claim", result);
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  // ── repo (X4) ─────────────────────────────────────────────────────────────────────
+  v1.get("/repos", async (c) => {
+    const rows = await sql`SELECT * FROM workflows WHERE kind = 'repo' ORDER BY id DESC LIMIT 50`;
+    return c.json({ repos: rows });
+  });
+
+  v1.post("/repos", async (c) => {
+    try {
+      const user = requireRole(c, "admin", "trader");
+      const { dealerParty, counterpartyEns, collateralCid, cashAmountMicro, rateBps, days } = await c.req.json();
+      const amount = BigInt(cashAmountMicro);
+      // four-eyes folds into the booking: over-limit repos route to an approver
+      if (user.limitMicro !== null && amount > user.limitMicro) {
+        const [wf] = await sql`
+          INSERT INTO workflows (kind, state, status, created_by)
+          VALUES ('repo', ${sql.json({ side: "dealer", pending: { dealerParty, counterpartyEns, collateralCid, cashAmountMicro, rateBps, days } } as any)}, 'pending_approval', ${user.email})
+          RETURNING id`;
+        const [approval] = await sql`
+          INSERT INTO approvals (workflow_id, requested_by, amount)
+          VALUES (${wf.id}, ${user.email}, ${cashAmountMicro}) RETURNING id`;
+        chain.emitExternal({ type: "approval_pending", approvalId: approval.id, workflowId: wf.id, kind: "repo", requestedBy: user.email, amountMicro: cashAmountMicro });
+        await audit(sql, user.email, "repo_pending_approval", { workflowId: wf.id });
+        return c.json({ status: "pending_approval", approvalId: approval.id, workflowId: wf.id }, 202);
+      }
+      const result = await repo.propose(
+        dealerParty ?? "trading",
+        counterpartyEns,
+        collateralCid,
+        amount,
+        BigInt(rateBps),
+        BigInt(days),
+        user.email,
+      );
+      await audit(sql, user.email, "repo_propose", { counterpartyEns, cashAmountMicro, rateBps, days, ...result });
+      chain.emitExternal({ type: "workflow_updated", kind: "repo", id: result.workflowId, state: "proposed" });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/repos/:id/accept", async (c) => {
+    try {
+      const user = requireRole(c, "admin", "trader");
+      const result = await repo.accept(Number(c.req.param("id")), user.email);
+      await audit(sql, user.email, "repo_accept", { id: c.req.param("id"), ...result });
+      chain.emitExternal({ type: "workflow_updated", kind: "repo", id: Number(c.req.param("id")), state: "live" });
+      return c.json(result);
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
+  v1.post("/repos/:id/close", async (c) => {
+    try {
+      const user = requireRole(c, "admin", "trader");
+      const result = await repo.close(Number(c.req.param("id")));
+      await audit(sql, user.email, "repo_close", { id: c.req.param("id"), ...result });
+      chain.emitExternal({ type: "workflow_updated", kind: "repo", id: Number(c.req.param("id")), state: "closed" });
       return c.json(result);
     } catch (e) {
       return onError(c, e);

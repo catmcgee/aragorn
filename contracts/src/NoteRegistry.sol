@@ -74,13 +74,15 @@ contract NoteRegistry {
     }
 
     /// Seed-script-only path for the demo's pre-issued bond position (BUILD_SPEC S10.3).
-    /// Owner-gated, single use, narrated honestly in the demo.
-    function seedCommitments(bytes32[] calldata commitments) external {
+    /// Owner-gated, single use, narrated honestly in the demo. Emits a normal Settled event
+    /// (circuitId 0) so Ring sync engines discover seeded notes like any other.
+    function seedCommitments(bytes32[] calldata commitments, bytes[] calldata ciphertexts) external {
         require(msg.sender == owner && !seeded, "registry: seeded");
         seeded = true;
         for (uint256 i = 0; i < commitments.length; i++) {
             _insert(commitments[i]);
         }
+        emit Settled(0, new bytes32[](0), commitments, ciphertexts, 0, tx.origin);
     }
 
     // -- views -----------------------------------------------------------------------------

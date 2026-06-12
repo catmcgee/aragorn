@@ -98,3 +98,19 @@ produces the non-ZK proof (length mismatch revert). Correct option:
 `generateProof(witness, { verifierTarget: 'evm' })` (ipaAccumulation:false, keccak oracle,
 ZK enabled). Also: the real Anvil mnemonic key 0 is
 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80.
+### D-012: ENS v2 (USER DECISION) — dual-path on Sepolia
+2026-06-12. Sepolia ENS is mid-ENSv2-migration; the v1 BaseRegistrar accepts NO controllers
+(docs' new controller unauthorized — verified by trace). Live registrations flow through
+ENSv2 contracts. We run BOTH paths:
+1. **aragorn-rings.eth** — registered via v2 `TestnetV1PremigrationRegistrar` (0xdf60…,
+   free, no commit-reveal): v1-owned + v2-RESERVED with ENSV1Resolver fallback. Subnames/
+   records on the v1 classic PublicResolver = the canonical premigration resolution path
+   through UniversalResolverV2. Stable, unshadowable (v2 entry owner=0, roleBitmap=0).
+2. **aragornrings.eth (CANONICAL for the demo)** — fully v2-NATIVE: registered via the real
+   v2 ETHRegistrar (0x8c2E86…, commit-reveal, paid in free-mint MockERC20), records on an
+   owner-deployed PermissionedResolver proxy (VerifiableFactory + EAC role bitmaps), org
+   subname records stored per-node on the 2LD resolver and resolved via v2's
+   deepest-resolver-wins wildcard. Verified end-to-end via viem getEnsText.
+Key v2 Sepolia addrs: .eth registry 0xDEDB9291…, ETHRegistrar 0x8c2E866B…, VerifiableFactory
+0xD2a632D8…, PermissionedResolver impl 0xdcE5205A…, our resolver proxy 0xC909a297…,
+UniversalResolverV2 0xeEeEEEeE14D…. Scripts: ens-setup.ts (path 1), ens-v2-setup.ts (path 2).

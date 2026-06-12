@@ -87,6 +87,18 @@ export async function migrate(sql: Sql): Promise<void> {
       x25519_pub TEXT
     )`;
   await sql`
+    CREATE TABLE IF NOT EXISTS payroll_items (
+      id SERIAL PRIMARY KEY,
+      workflow_id INTEGER REFERENCES workflows(id),
+      employee_id INTEGER REFERENCES employees(id),
+      amount_micro BIGINT NOT NULL,
+      claim_hash TEXT NOT NULL,
+      claim_secret TEXT NOT NULL,
+      entitlement_cid TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',          -- pending | claimable | claimed
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`;
+  await sql`
     CREATE TABLE IF NOT EXISTS ens_whitelist (
       ens_name TEXT PRIMARY KEY,
       resolved_encpubkey TEXT,

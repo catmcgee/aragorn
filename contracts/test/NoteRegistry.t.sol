@@ -111,10 +111,10 @@ contract NoteRegistryTest is Test {
     function test_seed_commitments_once() public {
         bytes32[] memory cs = new bytes32[](1);
         cs[0] = bytes32(uint256(111));
-        registry.seedCommitments(cs);
+        registry.seedCommitments(cs, new bytes[](0));
         assertEq(registry.root(), ROOT_AFTER_111);
         vm.expectRevert("registry: seeded");
-        registry.seedCommitments(cs);
+        registry.seedCommitments(cs, new bytes[](0));
     }
 
     function test_vault_only_registry() public {

@@ -10,6 +10,8 @@ import { AuthService } from "./auth.ts";
 import { EnsDirectory } from "./ens.ts";
 import { buildApi } from "./api.ts";
 import { buildGateway } from "./gateway.ts";
+import { Payroll } from "./payroll.ts";
+import { RepoDesk } from "./repo.ts";
 
 const cfg = loadConfig();
 await initPoseidon();
@@ -33,9 +35,15 @@ const auth = new AuthService(
   cfg.emailDomainAllowlist,
 );
 
+const payroll = new Payroll(sql, chain, flows, encKeys.publicKey);
+const repo = new RepoDesk(sql, chain, flows, ens, encKeys.publicKey, cfg.orgName);
+
 await chain.start();
 
-const app = buildApi(cfg, sql, chain, flows, auth, ens);
+// maturity cron (BUILD_SPEC §6.3): every 10s
+setInterval(() => void repo.maturityTick().catch(() => {}), 10_000);
+
+const app = buildApi(cfg, sql, chain, flows, auth, ens, payroll, repo);
 if (process.env.GATEWAY_SIGNER_KEY) {
   app.route("/", buildGateway(sql, process.env.GATEWAY_SIGNER_KEY as `0x${string}`, process.env.RING_ENS));
 }

@@ -13,7 +13,7 @@ import {
 } from "viem";
 
 const RING = process.env.RING_URL ?? "http://127.0.0.1:4001";
-const NAME = process.env.CCIP_NAME ?? "cat.ubs.aragorn-rings.eth";
+const NAME = process.env.CCIP_NAME ?? "cat.ubs.aragornrings.eth";
 const SENDER = "0x000000000000000000000000000000000000c01d"; // placeholder resolver addr
 
 function dnsEncode(name: string): `0x${string}` {

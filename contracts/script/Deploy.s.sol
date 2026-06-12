@@ -9,6 +9,11 @@ import {Poseidon2Yul_BN254} from "../src/Poseidon2Yul.sol";
 import {CashShieldVerifier} from "../src/verifiers/CashShieldVerifier.sol";
 import {CashTransferVerifier} from "../src/verifiers/CashTransferVerifier.sol";
 import {CashUnshieldVerifier} from "../src/verifiers/CashUnshieldVerifier.sol";
+import {CashFanoutVerifier} from "../src/verifiers/CashFanoutVerifier.sol";
+import {EntitlementClaimVerifier} from "../src/verifiers/EntitlementClaimVerifier.sol";
+import {RepoProposeAllocateVerifier} from "../src/verifiers/RepoProposeAllocateVerifier.sol";
+import {RepoAcceptVerifier} from "../src/verifiers/RepoAcceptVerifier.sol";
+import {RepoCloseVerifier} from "../src/verifiers/RepoCloseVerifier.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -23,6 +28,11 @@ contract Deploy is Script {
         registry.setVerifier(1, IVerifier(address(new CashShieldVerifier())));
         registry.setVerifier(2, IVerifier(address(new CashTransferVerifier())));
         registry.setVerifier(3, IVerifier(address(new CashUnshieldVerifier())));
+        registry.setVerifier(4, IVerifier(address(new CashFanoutVerifier())));
+        registry.setVerifier(5, IVerifier(address(new EntitlementClaimVerifier())));
+        registry.setVerifier(6, IVerifier(address(new RepoProposeAllocateVerifier())));
+        registry.setVerifier(7, IVerifier(address(new RepoAcceptVerifier())));
+        registry.setVerifier(8, IVerifier(address(new RepoCloseVerifier())));
 
         vm.stopBroadcast();
 
