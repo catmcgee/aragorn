@@ -12,11 +12,11 @@ Recorded at build start, 2026-06-12. Update only with a DECISIONS.md entry.
 | Node | 25.9.0 | spec said 22 LTS; 25 present and fine |
 | bun | 1.2.22 | replaces pnpm (user decision, D-008) |
 | turborepo | ^2.5.0 | |
-| Next.js | TBD (P3) | latest stable App Router |
-| viem | TBD (P1) | latest |
-| @privy-io/react-auth / server-auth | TBD (P3) | |
-| biscuit-wasm | TBD (P2) | |
-| drizzle-orm / postgres | TBD (P2) | Postgres 16 via docker (local psql is 14 — use docker) |
+| Next.js | 16.2.9 (Turbopack) | App Router |
+| viem | 2.52.2 | |
+| @privy-io/react-auth / @privy-io/node | 3.29.2 / 0.21.x | server-auth deprecated; JWKS verify for test tokens |
+| @biscuit-auth/biscuit-wasm | 0.6.0 | rings run on Node (wasm-modules); bun incompatible |
+| postgres (porsager) | 3.x | raw SQL, no ORM (hackathon cut); Postgres 16 via docker :5434 |
 | @noble/curves / @noble/ciphers | TBD (P1) | |
 
 | noir-lang/poseidon | v0.3.0 | Poseidon2 (stdlib version is pub(crate)) |
