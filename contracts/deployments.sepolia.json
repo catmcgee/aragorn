@@ -1,0 +1,8 @@
+{
+  "poseidon": "0x9051b71ae33aa40d38b6ddd6bc0a15f0c0789cdd",
+  "usdc": "0x84144cf798459687d0cc5bb68b79a100ea1dba10",
+  "vault": "0xe4c260aa07d716022c4e4939e36fa6afd80758c5",
+  "registry": "0x9bf205413f6ca381f2cb70de6f196aa436cae72d",
+  "chainId": 11155111,
+  "deployBlock": 11052643
+}

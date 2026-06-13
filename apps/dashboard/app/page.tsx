@@ -28,10 +28,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // After authenticating, resolve accessible rings and route to picker or onboarding.
+  // After authenticating, resolve accessible rings → the picker (which handles the
+  // empty state). We don't jump straight into onboarding: "no rings" is often transient
+  // (a Ring restarting) and the user should see why + be able to retry.
   function resolveRings(found: AccessibleRing[]) {
     setRings(found);
-    setPhase(found.length ? "rings" : "onboard");
+    setPhase("rings");
   }
 
   async function onPrivyToken(privyToken: string) {
@@ -61,14 +63,30 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center bg-ground px-6 py-12">
-      <div className="mb-10 flex flex-col items-center text-center">
-        <BorromeanMark size={52} />
-        <h1 className="mt-6 text-xl font-semibold tracking-[0.3em] text-ink">ARAGORN</h1>
-        <p className="mt-2 text-[13px] text-ink-5">
-          Private institutional settlement on public Ethereum
-        </p>
-      </div>
+    <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-ground px-6 py-12">
+      {/* faint gold Borromean watermark, bleeding off the top-right (matches the app) */}
+      <svg
+        width="640"
+        height="640"
+        viewBox="0 0 400 400"
+        aria-hidden
+        className="pointer-events-none absolute -top-[120px] -right-[140px] z-0"
+      >
+        <g fill="none" stroke="#b08833" strokeWidth="1.3" strokeOpacity="0.12">
+          <circle cx="190" cy="150" r="120" />
+          <circle cx="270" cy="150" r="120" />
+          <circle cx="230" cy="240" r="120" />
+        </g>
+      </svg>
+
+      <div className="relative z-[1] w-full max-w-sm rounded-2xl border border-line bg-paper px-8 py-10 shadow-[0_2px_24px_rgb(20_30_45/0.06)]">
+        <div className="mb-9 flex flex-col items-center text-center">
+          <BorromeanMark size={52} />
+          <h1 className="mt-6 text-xl font-semibold tracking-[0.3em] text-ink">ARAGORN</h1>
+          <p className="mt-2 text-[13px] text-ink-5">
+            Private institutional settlement on public Ethereum
+          </p>
+        </div>
 
       {phase === "signin" && (
         <SignIn
@@ -91,6 +109,7 @@ export default function LoginPage() {
           hasRings={rings.length > 0}
         />
       )}
+      </div>
     </main>
   );
 }
@@ -213,6 +232,12 @@ function RingPicker({
   return (
     <div className="space-y-4">
       <div className="label">Your Rings</div>
+      {rings.length === 0 && (
+        <p className="rounded-lg border border-line bg-ground px-3 py-3 text-[12.5px] leading-relaxed text-ink-4">
+          No Rings found for your email yet. If your institution runs a Ring, an admin needs
+          to invite you — then sign in again. Or create your own below.
+        </p>
+      )}
       <div className="space-y-2.5">
         {rings.map((r) => (
           <button
