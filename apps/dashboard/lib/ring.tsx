@@ -47,6 +47,63 @@ export function storeBiscuit(biscuit: string): void {
   makeClient().setToken(biscuit);
 }
 
+/** Store a ring's session biscuit by key (used when probing multiple rings at login). */
+export function storeBiscuitFor(ring: RingKey, biscuit: string): void {
+  localStorage.setItem(biscuitKey(ring), biscuit);
+}
+
+/** Commit to a ring: make it active and force the client singleton to rebuild for it. */
+export function enterRing(ring: RingKey): void {
+  setRingKey(ring);
+  singleton = null;
+  singletonUrl = null;
+}
+
+/** A ring this identity can actually access (resolved at login by probing the nodes). */
+export interface AccessibleRing {
+  key: RingKey;
+  url: string;
+  org: string;
+  ens: string | null;
+  role: string;
+}
+
+/** Probe every known ring node with a Privy token; return the ones that admit this
+ *  identity (domain-allowed + invited), storing each one's session biscuit. */
+export async function probePrivy(privyToken: string): Promise<AccessibleRing[]> {
+  const out: AccessibleRing[] = [];
+  for (const key of Object.keys(RINGS) as RingKey[]) {
+    const url = RINGS[key].url;
+    try {
+      const client = new RingClient(url);
+      const { biscuit } = await client.exchange(privyToken);
+      storeBiscuitFor(key, biscuit);
+      client.setToken(biscuit);
+      const me = await client.me();
+      out.push({ key, url, org: me.org, ens: me.ens, role: me.user.role });
+    } catch {
+      // not a member of this ring — skip
+    }
+  }
+  return out;
+}
+
+/** Probe every node with a service/dev token; return the one(s) it authenticates against. */
+export async function probeDevToken(token: string): Promise<AccessibleRing[]> {
+  const out: AccessibleRing[] = [];
+  for (const key of Object.keys(RINGS) as RingKey[]) {
+    const url = RINGS[key].url;
+    try {
+      const client = new RingClient(url, token);
+      const me = await client.me();
+      out.push({ key, url, org: me.org, ens: me.ens, role: me.user.role });
+    } catch {
+      // token not valid on this node
+    }
+  }
+  return out;
+}
+
 export function storeDevToken(token: string): void {
   localStorage.setItem(DEV_TOKEN_KEY, token);
   makeClient().setToken(token);

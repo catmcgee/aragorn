@@ -11,6 +11,10 @@ const step = (s: string) => console.log(`   ${s}`);
 
 // 1. users & roles (§10.7)
 step("users: UBS {admin, jane=trader($1M limit), marcus=approver, auditor} + DRW {admin, trader}");
+// the founder/operator identity — signs in with their real work email via Privy,
+// admin on both Rings so they can drive either side of the demo.
+await UBS.inviteUser("helloworld@mcgee.cat", "admin", ["treasury", "trading"]);
+await DRW.inviteUser("helloworld@mcgee.cat", "admin", ["desk"]);
 await UBS.inviteUser("admin@ubs-demo.com", "admin", ["treasury", "trading"]);
 await UBS.inviteUser("jane@ubs-demo.com", "trader", ["treasury", "trading"], $(1_000_000));
 await UBS.inviteUser("marcus@ubs-demo.com", "approver", []);

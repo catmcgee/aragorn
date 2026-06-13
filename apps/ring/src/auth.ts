@@ -73,14 +73,19 @@ export class AuthService {
         privyUser?.linked_accounts?.find((a: any) => a.type === "email")?.address ??
         privyUser?.email?.address;
       if (!email) throw new Error("privy user has no email");
-      const domain = email.split("@")[1];
-      if (this.emailDomainAllowlist.length && !this.emailDomainAllowlist.includes(domain)) {
-        throw new Error(`email domain ${domain} not allowed`);
-      }
+      // An explicit admin invite is authority enough — invited users bypass the domain
+      // gate. The allowlist only restricts who self-signup could onboard (we don't
+      // auto-create users, so an un-invited email is rejected regardless).
       const updated = await this.sql`
         UPDATE users SET privy_did = ${did} WHERE email = ${email} AND privy_did IS NULL
         RETURNING *`;
-      if (!updated.length) throw new Error(`no invite for ${email} — ask an admin`);
+      if (!updated.length) {
+        const domain = email.split("@")[1];
+        if (this.emailDomainAllowlist.length && !this.emailDomainAllowlist.includes(domain)) {
+          throw new Error(`email domain ${domain} not allowed`);
+        }
+        throw new Error(`no invite for ${email} — ask an admin`);
+      }
       row = updated[0];
     }
 

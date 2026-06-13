@@ -1,170 +1,178 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// Login flow: sign in FIRST (work email via Privy, or a dev token), then resolve which
+// Rings this identity can access and show them. No Ring? Create one (onboarding).
+// There is no "pick a ring before you log in" — a Ring is something you belong to.
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy, useLogin, getAccessToken } from "@privy-io/react-auth";
 import {
-  RINGS,
+  type AccessibleRing,
   type RingKey,
-  getRingKey,
-  setRingKey,
-  makeClient,
-  storeBiscuit,
+  clearAuth,
+  enterRing,
+  probeDevToken,
+  probePrivy,
   storeDevToken,
 } from "@/lib/ring";
 import { privyConfigured } from "./providers";
 import { BorromeanMark, RingGlyph } from "@/components/rings";
 
-// Each entrance is a ring: UBS wears the gold accent, DRW the steel.
-const RING_STYLE: Record<RingKey, { color: string; idle: string; selected: string }> = {
-  ubs: {
-    color: "#b08833",
-    idle: "border-gold/35 hover:border-gold/70",
-    selected: "border-gold bg-gold/[0.07]",
-  },
-  drw: {
-    color: "#1c4f68",
-    idle: "border-steel/30 hover:border-steel/60",
-    selected: "border-steel bg-steel/[0.07]",
-  },
-};
+type Phase = "signin" | "rings" | "onboard";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [ring, setRing] = useState<RingKey | null>(null);
-  const [devToken, setDevToken] = useState("");
+  const [phase, setPhase] = useState<Phase>("signin");
+  const [rings, setRings] = useState<AccessibleRing[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    setRing(getRingKey());
-  }, []);
-
-  function pickRing(k: RingKey) {
-    setRingKey(k);
-    setRing(k);
-    setError(null);
+  // After authenticating, resolve accessible rings and route to picker or onboarding.
+  function resolveRings(found: AccessibleRing[]) {
+    setRings(found);
+    setPhase(found.length ? "rings" : "onboard");
   }
 
-  async function exchangePrivyToken(privyToken: string) {
-    const client = makeClient();
-    const { biscuit } = await client.exchange(privyToken);
-    storeBiscuit(biscuit);
-    router.push("/portfolio");
+  async function onPrivyToken(privyToken: string) {
+    clearAuth(); // a fresh Privy session shouldn't inherit a stale dev token
+    const found = await probePrivy(privyToken);
+    resolveRings(found);
   }
 
-  async function devLogin() {
+  async function onDevToken(token: string) {
     setError(null);
-    if (!ring) return setError("Select a ring first");
-    const token = devToken.trim();
-    if (!token) return setError("Enter a dev token");
     setBusy(true);
     try {
+      const found = await probeDevToken(token);
+      if (!found.length) throw new Error("token not valid on any Ring");
       storeDevToken(token);
-      await makeClient().me(); // validate the token against the ring
-      router.push("/portfolio");
+      resolveRings(found);
     } catch (e) {
-      localStorage.removeItem("dev-token");
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
+  function enter(ring: RingKey) {
+    enterRing(ring);
+    router.push("/portfolio");
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center bg-ground px-6 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
-        <BorromeanMark size={56} />
-        <h1 className="mt-6 text-xl font-semibold tracking-[0.3em] text-ink">
-          ARAGORN
-        </h1>
+        <BorromeanMark size={52} />
+        <h1 className="mt-6 text-xl font-semibold tracking-[0.3em] text-ink">ARAGORN</h1>
         <p className="mt-2 text-[13px] text-ink-5">
           Private institutional settlement on public Ethereum
         </p>
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <div className="label">Enter your ring</div>
-          <div className="grid grid-cols-2 gap-3">
-            {(Object.keys(RINGS) as RingKey[]).map((k) => {
-              const s = RING_STYLE[k];
-              return (
-                <button
-                  key={k}
-                  onClick={() => pickRing(k)}
-                  className={`flex flex-col items-center gap-2.5 rounded-xl border bg-paper px-4 py-6 text-sm font-medium text-ink-2 shadow-[0_1px_2px_rgb(20_30_45/0.04)] transition-colors ${
-                    ring === k ? s.selected : s.idle
-                  }`}
-                >
-                  <RingGlyph size={26} color={s.color} />
-                  {RINGS[k].label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {phase === "signin" && (
+        <SignIn
+          configured={privyConfigured()}
+          busy={busy}
+          error={error}
+          setError={setError}
+          onPrivyToken={onPrivyToken}
+          onDevToken={onDevToken}
+        />
+      )}
 
-        {privyConfigured() ? (
-          <PrivyLoginButton
-            ring={ring}
-            onError={(m) => setError(m)}
-            onToken={exchangePrivyToken}
-          />
-        ) : (
-          <p className="text-xs text-ink-5">
-            Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID). Use a dev token
-            below.
-          </p>
-        )}
+      {phase === "rings" && (
+        <RingPicker rings={rings} onEnter={enter} onCreate={() => setPhase("onboard")} />
+      )}
 
-        <details className="border-t border-line-soft pt-4">
-          <summary className="cursor-pointer text-[10px] tracking-[0.18em] text-ink-6 uppercase transition-colors hover:text-ink-4">
-            Developer
-          </summary>
-          <div className="mt-3">
-            <label className="label" htmlFor="dev-token">
-              Dev token (bypass Privy)
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="dev-token"
-                className="input flex-1"
-                placeholder="e.g. ubs-api-token"
-                value={devToken}
-                onChange={(e) => setDevToken(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && devLogin()}
-              />
-              <button className="btn" disabled={busy} onClick={devLogin}>
-                Use
-              </button>
-            </div>
-          </div>
-        </details>
-
-        {error && <p className="err">{error}</p>}
-      </div>
+      {phase === "onboard" && (
+        <Onboard
+          onCancel={() => setPhase(rings.length ? "rings" : "signin")}
+          hasRings={rings.length > 0}
+        />
+      )}
     </main>
   );
 }
 
-function PrivyLoginButton({
-  ring,
+/* ── Step 1: sign in ──────────────────────────────────────────────────────── */
+function SignIn({
+  configured,
+  busy,
+  error,
+  setError,
+  onPrivyToken,
+  onDevToken,
+}: {
+  configured: boolean;
+  busy: boolean;
+  error: string | null;
+  setError: (m: string | null) => void;
+  onPrivyToken: (t: string) => Promise<void>;
+  onDevToken: (t: string) => Promise<void>;
+}) {
+  const [devToken, setDevToken] = useState("");
+  return (
+    <div className="space-y-5">
+      {configured ? (
+        <PrivyButton onError={setError} onToken={onPrivyToken} />
+      ) : (
+        <p className="text-xs text-ink-5">
+          Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID). Use a dev token below.
+        </p>
+      )}
+      <p className="text-center text-[12px] text-ink-5">
+        Sign in with your work email. No wallet, no keys.
+      </p>
+
+      <details className="border-t border-line-soft pt-4">
+        <summary className="cursor-pointer text-[10px] tracking-[0.18em] text-ink-6 uppercase transition-colors hover:text-ink-4">
+          Developer
+        </summary>
+        <div className="mt-3">
+          <label className="label" htmlFor="dev-token">
+            Service / dev token
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="dev-token"
+              className="input flex-1"
+              placeholder="e.g. ubs-api-token"
+              value={devToken}
+              onChange={(e) => setDevToken(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && devToken.trim() && onDevToken(devToken.trim())}
+            />
+            <button
+              className="btn"
+              disabled={busy || !devToken.trim()}
+              onClick={() => onDevToken(devToken.trim())}
+            >
+              {busy ? "…" : "Use"}
+            </button>
+          </div>
+        </div>
+      </details>
+
+      {error && <p className="err">{error}</p>}
+    </div>
+  );
+}
+
+function PrivyButton({
   onError,
   onToken,
 }: {
-  ring: RingKey | null;
-  onError: (msg: string) => void;
-  onToken: (privyToken: string) => Promise<void>;
+  onError: (m: string | null) => void;
+  onToken: (t: string) => Promise<void>;
 }) {
   const { ready, authenticated } = usePrivy();
   const [busy, setBusy] = useState(false);
 
-  async function doExchange() {
+  async function exchange() {
     setBusy(true);
     try {
       const t = await getAccessToken();
-      if (!t) throw new Error("No Privy access token");
+      if (!t) throw new Error("no Privy access token");
       await onToken(t);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -174,20 +182,168 @@ function PrivyLoginButton({
   }
 
   const { login } = useLogin({
-    onComplete: () => void doExchange(),
+    onComplete: () => void exchange(),
     onError: (e) => onError(String(e)),
   });
 
-  function click() {
-    onError("");
-    if (!ring) return onError("Select a ring first");
-    if (authenticated) void doExchange();
-    else login();
-  }
-
   return (
-    <button className="btn-primary w-full" disabled={!ready || busy} onClick={click}>
+    <button
+      className="btn-primary w-full"
+      disabled={!ready || busy}
+      onClick={() => {
+        onError(null);
+        authenticated ? void exchange() : login();
+      }}
+    >
       {busy ? "Signing in…" : "Sign in with Privy"}
     </button>
+  );
+}
+
+/* ── Step 2: pick a Ring you belong to ────────────────────────────────────── */
+function RingPicker({
+  rings,
+  onEnter,
+  onCreate,
+}: {
+  rings: AccessibleRing[];
+  onEnter: (k: RingKey) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="label">Your Rings</div>
+      <div className="space-y-2.5">
+        {rings.map((r) => (
+          <button
+            key={r.key}
+            onClick={() => onEnter(r.key)}
+            className="flex w-full items-center gap-3 rounded-xl border border-line bg-paper px-4 py-3.5 text-left shadow-[0_1px_2px_rgb(20_30_45/0.04)] transition-colors hover:border-steel/50"
+          >
+            <RingGlyph size={26} color="#b08833" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-ink">{r.org}</div>
+              <div className="truncate font-mono text-[11px] text-steel">
+                {r.ens ?? `${r.org.toLowerCase()}.aragorn.eth`}
+              </div>
+            </div>
+            <span className="rounded-md border border-steel/40 px-1.5 py-1 text-[9.5px] tracking-[0.06em] text-steel uppercase">
+              {r.role}
+            </span>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={onCreate}
+        className="w-full rounded-xl border border-dashed border-line px-4 py-3 text-[13px] text-ink-5 transition-colors hover:border-steel/40 hover:text-ink-3"
+      >
+        + Create a new Ring
+      </button>
+    </div>
+  );
+}
+
+/* ── Create a Ring (onboarding) — the design's 3-step flow ────────────────── */
+function Onboard({ onCancel, hasRings }: { onCancel: () => void; hasRings: boolean }) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const ens = `${(name || "your-institution").toLowerCase().replace(/[^a-z0-9-]+/g, "")}.aragorn.eth`;
+
+  return (
+    <div className="space-y-5 text-center">
+      {step === 0 && (
+        <>
+          <div className="text-[20px] text-ink">Create your Ring</div>
+          <p className="text-[12.5px] leading-relaxed text-ink-4">
+            Your sovereign private ledger node. Name your institution — this becomes your ENS
+            on Aragorn.
+          </p>
+          <div className="mt-2 text-left">
+            <div className="label">Institution name</div>
+            <input
+              autoFocus
+              className="input w-full"
+              placeholder="UBS"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && name.trim() && setStep(1)}
+            />
+            <div className="mt-2 font-mono text-[12px] text-steel">{ens}</div>
+          </div>
+          <button
+            className="btn-primary w-full"
+            disabled={!name.trim()}
+            onClick={() => setStep(1)}
+          >
+            Continue
+          </button>
+        </>
+      )}
+
+      {step === 1 && (
+        <>
+          <div className="text-[20px] text-ink">Invite your team</div>
+          <p className="text-[12.5px] leading-relaxed text-ink-4">
+            Add colleagues by work email. Roles and limits can be set later in Admin. No
+            wallets, no keys.
+          </p>
+          <div className="mt-2 flex flex-col gap-2 text-left">
+            {["cfo", "trader", "ops"].map((u) => (
+              <div
+                key={u}
+                className="flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2.5 text-[13px] text-ink-6"
+              >
+                + {u}@{(name || "institution").toLowerCase().replace(/[^a-z0-9]+/g, "")}.com
+              </div>
+            ))}
+          </div>
+          <button className="btn-primary w-full" onClick={() => setStep(2)}>
+            Create Ring
+          </button>
+        </>
+      )}
+
+      {step === 2 && (
+        <div className="flex flex-col items-center">
+          <svg width="84" height="84" viewBox="0 0 100 100" aria-hidden>
+            <circle cx="50" cy="50" r="38" fill="none" stroke="rgb(23 32 42 / 0.1)" strokeWidth="5" />
+            <g className="ring-orbit" style={{ transformOrigin: "50px 50px" }}>
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                fill="none"
+                stroke="#b08833"
+                strokeWidth="5"
+                strokeDasharray="60 240"
+                strokeLinecap="round"
+              />
+            </g>
+          </svg>
+          <div className="mt-5 text-[18px] text-ink">Deploying your Ring…</div>
+          <p className="mt-1.5 text-[12px] text-ink-4">
+            Registering <span className="font-mono text-steel">{ens}</span> · provisioning
+            private ledger node
+          </p>
+          <p className="mt-4 max-w-xs text-[11px] leading-relaxed text-ink-6">
+            In this preview, Rings are provisioned out of band by an operator
+            (<span className="font-mono">scripts/provision-ring.sh</span>). For the demo, sign
+            in to an existing Ring.
+          </p>
+          <button className="btn mt-5" onClick={onCancel}>
+            {hasRings ? "Back to your Rings" : "Back"}
+          </button>
+        </div>
+      )}
+
+      {step < 2 && (
+        <button
+          className="text-[11px] text-ink-6 hover:text-ink-4"
+          onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
+        >
+          {step === 0 ? "Cancel" : "Back"}
+        </button>
+      )}
+    </div>
   );
 }
