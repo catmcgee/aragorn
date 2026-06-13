@@ -7,8 +7,8 @@ import { createContext, useContext } from "react";
 import { RingClient, type Me } from "@aragorn/sdk";
 
 export const RINGS = {
-  ubs: { label: "UBS Ring", url: "http://127.0.0.1:4001" },
-  drw: { label: "DRW Ring", url: "http://127.0.0.1:4002" },
+  ubs: { label: "JP Morgan", url: "http://127.0.0.1:4001" },
+  drw: { label: "Goldman Sachs", url: "http://127.0.0.1:4002" },
 } as const;
 
 export type RingKey = keyof typeof RINGS;

@@ -43,7 +43,7 @@ const bond = newNote(
   {
     owner_x: holder.x,
     issuer_x: goldman.x,
-    isin_hash: stringHash("US38141G1040-DEMO"),
+    isin_hash: stringHash("US91282CEZ-DEMO"),
     face_amount: FACE,
     encumbrance: 0n,
   },
@@ -61,4 +61,4 @@ const registry = getContract({
 });
 const hash = await registry.write.seedCommitments([[fieldToHex(c)], cts]);
 await pub.waitForTransactionReceipt({ hash });
-console.log(`seeded bond ${fieldToHex(c)} (face $${Number(FACE / 1_000_000n).toLocaleString()}, issuer "Goldman Sachs") tx=${hash}`);
+console.log(`seeded bond ${fieldToHex(c)} (face $${Number(FACE / 1_000_000n).toLocaleString()}, issuer "US Treasury") tx=${hash}`);

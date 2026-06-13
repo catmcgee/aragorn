@@ -10,25 +10,25 @@ const $ = (n: number) => BigInt(Math.round(n * 1e6));
 const step = (s: string) => console.log(`   ${s}`);
 
 // 1. users & roles (§10.7)
-step("users: UBS {admin, jane=trader($1M limit), marcus=approver, auditor} + DRW {admin, trader}");
+step("users: JPM {admin, jane=trader($1M limit), marcus=approver, auditor} + GS {admin, trader}");
 // the founder/operator identity — signs in with their real work email via Privy,
 // admin on both Rings so they can drive either side of the demo.
 await UBS.inviteUser("helloworld@mcgee.cat", "admin", ["treasury", "trading"]);
 await DRW.inviteUser("helloworld@mcgee.cat", "admin", ["desk"]);
-await UBS.inviteUser("admin@ubs-demo.com", "admin", ["treasury", "trading"]);
-await UBS.inviteUser("jane@ubs-demo.com", "trader", ["treasury", "trading"], $(1_000_000));
-await UBS.inviteUser("marcus@ubs-demo.com", "approver", []);
-await UBS.inviteUser("auditor@ubs-demo.com", "auditor", []);
-await DRW.inviteUser("admin@drw-demo.com", "admin", ["desk"]);
-await DRW.inviteUser("trader@drw-demo.com", "trader", ["desk"], $(10_000_000));
+await UBS.inviteUser("admin@jpmorgan-demo.com", "admin", ["treasury", "trading"]);
+await UBS.inviteUser("jane@jpmorgan-demo.com", "trader", ["treasury", "trading"], $(1_000_000));
+await UBS.inviteUser("marcus@jpmorgan-demo.com", "approver", []);
+await UBS.inviteUser("auditor@jpmorgan-demo.com", "auditor", []);
+await DRW.inviteUser("admin@goldman-demo.com", "admin", ["desk"]);
+await DRW.inviteUser("trader@goldman-demo.com", "trader", ["desk"], $(10_000_000));
 
 // 2. counterparty whitelists via live Sepolia ENS (§10.8 idempotent)
 step("whitelists: live ENSv2 resolution both directions");
-await UBS.addWhitelist("drw.aragornrings.eth");
-await DRW.addWhitelist("ubs.aragornrings.eth");
+await UBS.addWhitelist("goldman.aragornrings.eth");
+await DRW.addWhitelist("jpmorgan.aragornrings.eth");
 
 // 3. employees + subnames
-step("employees: cat, alice, bob (CCIP subnames under ubs.aragornrings.eth)");
+step("employees: cat, alice, bob (CCIP subnames under jpmorgan.aragornrings.eth)");
 // sdk has no employees method; raw calls:
 async function raw(client: "ubs" | "drw", method: string, path: string, body?: unknown) {
   const base = client === "ubs" ? "http://127.0.0.1:4001" : "http://127.0.0.1:4002";
@@ -42,7 +42,7 @@ async function raw(client: "ubs" | "drw", method: string, path: string, body?: u
   if (!res.ok && res.status !== 202) throw new Error(`${path}: ${JSON.stringify(json).slice(0, 150)}`);
   return json as any;
 }
-for (const [label, email] of [["cat", "cat@ubs-demo.com"], ["alice", undefined], ["bob", undefined]] as const) {
+for (const [label, email] of [["cat", "cat@jpmorgan-demo.com"], ["alice", undefined], ["bob", undefined]] as const) {
   await raw("ubs", "POST", "/v1/employees", { subnameLabel: label, email });
 }
 
@@ -79,7 +79,7 @@ const marcus = (await raw("ubs", "POST", "/v1/service-tokens", { role: "approver
 const pending = await fetch("http://127.0.0.1:4001/v1/transfers", {
   method: "POST",
   headers: { "content-type": "application/json", authorization: `Bearer ${jane}` },
-  body: JSON.stringify({ fromParty: "treasury", toPartyOrEns: "UBS::trading", amountMicro: $(2_000_000).toString() }),
+  body: JSON.stringify({ fromParty: "treasury", toPartyOrEns: "JP Morgan::trading", amountMicro: $(2_000_000).toString() }),
 }).then((r) => r.json() as any);
 await fetch(`http://127.0.0.1:4001/v1/approvals/${pending.approvalId}/decide`, {
   method: "POST",

@@ -50,7 +50,7 @@ RPC_URL=$RPC bun scripts/seed-bond.ts
 echo "── coordinator + rings + dashboard"
 RPC_URL=$RPC PORT=4900 bun apps/coordinator/src/index.ts & echo $! >> $PIDFILE
 
-RING_ORG_NAME=UBS PORT=4001 RING_ENS=ubs.aragornrings.eth \
+RING_ORG_NAME="JP Morgan" PORT=4001 RING_ENS=jpmorgan.aragornrings.eth \
   DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_ubs \
   RPC_URL=$RPC NOTE_REGISTRY_ADDR=$REGISTRY USDC_ADDR=$USDC SHIELD_VAULT_ADDR=$VAULT \
   RELAYER_URL=http://127.0.0.1:4900 RELAYER_TOKEN=ubs-relay-token API_TOKEN=ubs-api-token \
@@ -59,13 +59,13 @@ RING_ORG_NAME=UBS PORT=4001 RING_ENS=ubs.aragornrings.eth \
   FUNDING_EOA_PRIVATE_KEY=$UBS_FUND_KEY \
   BISCUIT_ROOT_PRIV="ed25519-private/1111111111111111111111111111111111111111111111111111111111111111" \
   GATEWAY_SIGNER_KEY=0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba \
-  EMAIL_DOMAIN_ALLOWLIST="ubs-demo.com,privy.io" \
+  EMAIL_DOMAIN_ALLOWLIST="jpmorgan-demo.com,privy.io" \
   ENABLED_MODULES="payments,repo,payroll,issuance,strategies" \
   SEPOLIA_RPC_URL="$SEPOLIA_RPC_URL" PRIVY_APP_ID="${PRIVY_APP_ID:-}" PRIVY_APP_SECRET="${PRIVY_APP_SECRET:-}" \
   PRIVY_EARN_WALLET_ID="${PRIVY_EARN_WALLET_ID:-}" PRIVY_EARN_VAULT_ID="${PRIVY_EARN_VAULT_ID:-}" \
   node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts & echo $! >> $PIDFILE
 
-RING_ORG_NAME=DRW PORT=4002 RING_ENS=drw.aragornrings.eth \
+RING_ORG_NAME="Goldman Sachs" PORT=4002 RING_ENS=goldman.aragornrings.eth \
   DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_drw \
   RPC_URL=$RPC NOTE_REGISTRY_ADDR=$REGISTRY USDC_ADDR=$USDC SHIELD_VAULT_ADDR=$VAULT \
   RELAYER_URL=http://127.0.0.1:4900 RELAYER_TOKEN=drw-relay-token API_TOKEN=drw-api-token \
@@ -73,7 +73,7 @@ RING_ORG_NAME=DRW PORT=4002 RING_ENS=drw.aragornrings.eth \
   PARTY_KEYS='{"desk":"0x221"}' \
   FUNDING_EOA_PRIVATE_KEY=$DRW_FUND_KEY \
   BISCUIT_ROOT_PRIV="ed25519-private/2222222222222222222222222222222222222222222222222222222222222222" \
-  EMAIL_DOMAIN_ALLOWLIST="drw-demo.com,privy.io" \
+  EMAIL_DOMAIN_ALLOWLIST="goldman-demo.com,privy.io" \
   ENABLED_MODULES="payments,repo,strategies" \
   SEPOLIA_RPC_URL="$SEPOLIA_RPC_URL" PRIVY_APP_ID="${PRIVY_APP_ID:-}" PRIVY_APP_SECRET="${PRIVY_APP_SECRET:-}" \
   node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts & echo $! >> $PIDFILE

@@ -30,6 +30,19 @@ const wallet = createWalletClient({ account, chain: sepolia, transport: http(env
 // org node:        aragorn.modules, aragorn.auditorkey (+ existing encpubkey/endpoint/partyroot)
 // department node: aragorn.partykey (settlement pubkey x), aragorn.desk (human label)
 const RECORDS: Record<string, Record<string, string>> = {
+  // demo cast: JP Morgan (dealer, the old UBS keys) and Goldman Sachs (lender, old DRW keys)
+  [`jpmorgan.${PARENT}`]: {
+    "aragorn.encpubkey": "0x7b4e909bbe7ffe44c465a220037d608ee35897d31ef972f07f74892cb0f73f13",
+    "aragorn.endpoint": "http://127.0.0.1:4001",
+    "aragorn.partyroot": "0x17e0796c17481a34e6aa53421dce80dd2e7b2a1d49a48e49880faa8e7dcc97a4",
+    "aragorn.modules": "payments,repo,payroll,issuance,strategies",
+  },
+  [`goldman.${PARENT}`]: {
+    "aragorn.encpubkey": "0x0faa684ed28867b97f4a6a2dee5df8ce974e76b7018e3f22a1c4cf2678570f20",
+    "aragorn.endpoint": "http://127.0.0.1:4002",
+    "aragorn.partyroot": "0x0e6888df5c6acfaea4c9e2d31ffd717268abc22f9cba99efe0300295b3ae6e3a",
+    "aragorn.modules": "payments,repo,strategies",
+  },
   [`ubs.${PARENT}`]: {
     "aragorn.modules": "payments,repo,payroll,issuance,strategies",
     "aragorn.auditorkey": "0x7b4e909bbe7ffe44c465a220037d608ee35897d31ef972f07f74892cb0f73f13",

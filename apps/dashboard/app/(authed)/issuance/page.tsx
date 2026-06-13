@@ -14,8 +14,8 @@ import { LockRing, SettlementRing } from "@/components/rings";
 import { RoadmapBadge } from "@/components/RoadmapBox";
 
 // The ISIN travels as a hash commitment; the demo bond gets a desk label.
-const DEMO_ISIN_LABEL = "US38141G1040-DEMO";
-const DEMO_ISSUER = "Goldman Sachs";
+const DEMO_ISIN_LABEL = "US91282CEZ-DEMO";
+const DEMO_ISSUER = "US Treasury";
 
 function isEncumbered(c: ContractRow): boolean {
   try {
