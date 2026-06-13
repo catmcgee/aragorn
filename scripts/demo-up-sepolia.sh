@@ -58,7 +58,7 @@ echo "   minted \$100M MockUSDC"
 export RPC_URL="$RPC" NOTE_REGISTRY_ADDR="$REGISTRY" USDC_ADDR="$USDC" SHIELD_VAULT_ADDR="$VAULT"
 export RELAYER_URL=http://127.0.0.1:4900 SEPOLIA_RPC_URL="$SEPOLIA_RPC_URL"
 export PRIVY_APP_ID="${PRIVY_APP_ID:-}" PRIVY_APP_SECRET="${PRIVY_APP_SECRET:-}"
-export CHAIN=sepolia FUNDING_EOA_PRIVATE_KEY="$KEY" SYNC_START_BLOCK="$DEPLOY_BLOCK" SYNC_LOG_RANGE=9 EXPLORER_BASE="$EXPLORER"
+export CHAIN=sepolia FUNDING_EOA_PRIVATE_KEY="$KEY" SYNC_START_BLOCK="$DEPLOY_BLOCK" SYNC_LOG_RANGE=2000 EXPLORER_BASE="$EXPLORER"
 NODE="node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts"
 
 echo "── coordinator (relayer = deployer, pays Sepolia gas; serves /provision)"

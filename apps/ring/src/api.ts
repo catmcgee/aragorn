@@ -108,7 +108,11 @@ export function buildApi(
       limitMicro: user.limitMicro?.toString() ?? null,
       org: cfg.orgName,
       ens: process.env.RING_ENS ?? null,
-      explorerBase: process.env.EXPLORER_BASE ?? null,
+      // Explorer links are valid only when SETTLEMENT runs on the chain the explorer serves.
+      // Settlement-on-local-Anvil tx hashes don't exist on any public explorer, so suppress the
+      // link there (otherwise a tx chip → sepolia.etherscan.io 404s). Set EXPLORER_BASE only on
+      // the public-settlement path (demo-up-sepolia.sh, where RPC_URL is a real testnet).
+      explorerBase: /127\.0\.0\.1|localhost/.test(cfg.rpcUrl) ? null : (process.env.EXPLORER_BASE ?? null),
       enabledModules,
       capabilities: capabilitiesFor(user.role),
     });

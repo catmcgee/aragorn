@@ -1,0 +1,20 @@
+# Keep the build context small + never bake secrets into the image.
+# NOTE: circuits/*/target (Noir ACIR artifacts) MUST stay — the prover loads them at runtime.
+node_modules
+**/node_modules
+.git
+.next
+apps/dashboard/.next
+.turbo
+dist
+spikes
+contracts/out
+contracts/cache
+contracts/broadcast
+contracts/lib
+*.log
+# secrets come from Railway variables, not a baked-in env file
+.env
+.env.local
+.env.*.local
+te-amo.html

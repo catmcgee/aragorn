@@ -103,8 +103,12 @@ export default function RepoPage() {
 
   // book form
   const [collateralCid, setCollateralCid] = useState("");
-  const [dealerParty, setDealerParty] = useState(me.user.actAs[0] ?? "trading");
-  const [counterpartyEns, setCounterpartyEns] = useState("drw.aragornrings.eth");
+  // dealer party defaults to where collateral lives (trading desk holds the bonds), not actAs[0]
+  const [dealerParty, setDealerParty] = useState(
+    me.user.actAs.includes("trading") ? "trading" : (me.user.actAs[0] ?? "trading"),
+  );
+  // counterparty defaults to the first whitelisted name (set in the effect below), not a hardcode
+  const [counterpartyEns, setCounterpartyEns] = useState("");
   const [cash, setCash] = useState("");
   const [rateBps, setRateBps] = useState("");
   const [days, setDays] = useState("1");
@@ -132,6 +136,15 @@ export default function RepoPage() {
         );
       })
       .catch((e) => live && setError(cleanError(e)));
+    // default the counterparty to the first whitelisted ring (unless the user has typed one)
+    authedFetch(ringUrl, "/v1/whitelist")
+      .then((r) => {
+        if (!live) return;
+        const rows = (Array.isArray(r) ? r : (r.whitelist ?? r.rows ?? [])) as Array<{ ens_name?: string }>;
+        const first = rows[0]?.ens_name;
+        if (first) setCounterpartyEns((cur) => cur || first);
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };
@@ -430,7 +443,9 @@ export default function RepoPage() {
                           Accept — atomic <Term t="DvP" />
                         </button>
                       )}
-                      {r.status === "live" && (
+                      {/* Closing is the dealer's action (it repurchases with its own cash);
+                          the lender can't close, so only offer it on the dealer's row. */}
+                      {r.status === "live" && r.state.side === "dealer" && (
                         <button
                           className="btn"
                           disabled={busyId === r.id}
@@ -438,6 +453,9 @@ export default function RepoPage() {
                         >
                           Close now
                         </button>
+                      )}
+                      {r.status === "live" && r.state.side !== "dealer" && (
+                        <span className="text-xs text-ink-5">live — dealer repurchases at maturity</span>
                       )}
                       {outcomes[r.id] && (
                         <p className="mt-1 font-mono text-xs text-ink-4">

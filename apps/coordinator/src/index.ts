@@ -10,7 +10,14 @@ import { x25519 } from "@noble/curves/ed25519.js";
 import { initSchnorr, derivePartyKeys, randomField, fieldToHex } from "@aragorn/protocol";
 import { readFileSync } from "node:fs";
 import crypto from "node:crypto";
+import postgres from "postgres";
 const CHAIN = process.env.CHAIN === "sepolia" ? sepolia : foundry;
+
+// Hosted create-ring: spawned rings live in THIS container, reverse-proxied on the coordinator's
+// public URL, with their DBs created on a shared Postgres. Bounded so the container can't OOM.
+const MAX_RINGS = Number(process.env.MAX_RINGS ?? 5);
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL?.replace(/\/+$/, ""); // coordinator's public URL
+const PROVISION_DB = process.env.PROVISION_DATABASE_URL; // shared PG for dynamically-created ring DBs
 
 await initSchnorr();
 
@@ -73,6 +80,8 @@ app.post("/provision", async (c) => {
     slug = orgName.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!slug) return c.json({ error: "orgName has no usable [a-z0-9] characters" }, 400);
     if (provisioned.has(slug)) return c.json({ error: `Ring "${slug}" already provisioned` }, 409);
+    if (provisioned.size >= MAX_RINGS)
+      return c.json({ error: `ring limit reached (${MAX_RINGS}); remove one to add more` }, 429);
 
     // ── keys: party (Grumpkin/Schnorr) + org encryption (x25519) ──
     const partyPriv = fieldToHex(randomField());
@@ -106,22 +115,34 @@ app.post("/provision", async (c) => {
     const sepoliaRpc = process.env.SEPOLIA_RPC_URL;
 
     // ── create the ring's Postgres database (idempotent) ──
-    const created = Bun.spawnSync([
-      "docker",
-      "exec",
-      "aragorn-postgres",
-      "psql",
-      "-U",
-      "aragorn",
-      "-d",
-      "postgres",
-      "-q",
-      "-c",
-      `CREATE DATABASE ring_${slug}`,
-    ]);
-    if (created.exitCode !== 0) {
-      const err = created.stderr.toString();
-      if (!/already exists/i.test(err)) throw new Error(`db create failed: ${err.trim()}`);
+    const ringDbName = `ring_${slug}`;
+    let ringDbUrl: string;
+    if (PROVISION_DB) {
+      // hosted: CREATE DATABASE on the shared Postgres via a connection (no docker in-container)
+      const adminUrl = new URL(PROVISION_DB);
+      adminUrl.pathname = "/postgres";
+      const admin = postgres(adminUrl.toString(), { max: 1 });
+      try {
+        await admin.unsafe(`CREATE DATABASE "${ringDbName}"`);
+      } catch (e: any) {
+        if (!/already exists/i.test(String(e?.message))) throw e;
+      } finally {
+        await admin.end();
+      }
+      const ringUrlObj = new URL(PROVISION_DB);
+      ringUrlObj.pathname = `/${ringDbName}`;
+      ringDbUrl = ringUrlObj.toString();
+    } else {
+      // local: docker postgres
+      const created = Bun.spawnSync([
+        "docker", "exec", "aragorn-postgres", "psql", "-U", "aragorn", "-d", "postgres", "-q", "-c",
+        `CREATE DATABASE ${ringDbName}`,
+      ]);
+      if (created.exitCode !== 0) {
+        const err = created.stderr.toString();
+        if (!/already exists/i.test(err)) throw new Error(`db create failed: ${err.trim()}`);
+      }
+      ringDbUrl = `postgres://aragorn:aragorn@127.0.0.1:5434/${ringDbName}`;
     }
 
     // ── ENS: publish the org's resolution metadata on the PermissionedResolver ──
@@ -135,7 +156,7 @@ app.post("/provision", async (c) => {
       const node = namehash(ens);
       const records: [string, string][] = [
         ["aragorn.encpubkey", encPub],
-        ["aragorn.endpoint", `http://127.0.0.1:${port}`],
+        ["aragorn.endpoint", PUBLIC_BASE ? `${PUBLIC_BASE}/r/${slug}` : `http://127.0.0.1:${port}`],
         ["aragorn.partyroot", partyX],
         ["aragorn.modules", "payments,repo,strategies"],
       ];
@@ -161,7 +182,7 @@ app.post("/provision", async (c) => {
       RING_ORG_NAME: orgName,
       RING_ENS: ens,
       PORT: String(port),
-      DATABASE_URL: `postgres://aragorn:aragorn@127.0.0.1:5434/ring_${slug}`,
+      DATABASE_URL: ringDbUrl,
       NOTE_REGISTRY_ADDR: deploy.registry,
       USDC_ADDR: deploy.usdc,
       SHIELD_VAULT_ADDR: deploy.vault,
@@ -226,8 +247,9 @@ app.post("/provision", async (c) => {
 
     usedPorts.add(port);
     provisioned.set(slug, { port, orgName, ens, apiToken, relayToken, proc });
-    console.log(`[provision:${slug}] up on :${port} as ${ens}`);
-    return c.json({ ringUrl, ens, apiToken });
+    const publicRingUrl = PUBLIC_BASE ? `${PUBLIC_BASE}/r/${slug}` : ringUrl;
+    console.log(`[provision:${slug}] up on :${port} as ${ens} → ${publicRingUrl}`);
+    return c.json({ ringUrl: publicRingUrl, ens, apiToken });
   } catch (e: any) {
     if (proc) {
       try {
@@ -238,6 +260,30 @@ app.post("/provision", async (c) => {
     const msg = e?.shortMessage ?? e?.message ?? String(e);
     console.error(`[provision] failed:`, msg);
     return c.json({ error: msg }, 500);
+  }
+});
+
+// Reverse-proxy dynamically-created rings (which live in this container on internal ports)
+// so the browser can reach them on the coordinator's public URL: /r/<slug>/v1/... → ring:port/v1/...
+// Streams the upstream body through, so SSE (/v1/events, /public-feed) works too.
+app.all("/r/:slug/*", async (c) => {
+  const slug = c.req.param("slug");
+  const entry = provisioned.get(slug);
+  if (!entry) return c.json({ error: `unknown ring "${slug}"` }, 404);
+  const path = c.req.path.slice(`/r/${slug}`.length) || "/";
+  const qs = c.req.url.includes("?") ? "?" + c.req.url.split("?").slice(1).join("?") : "";
+  const method = c.req.method;
+  try {
+    const upstream = await fetch(`http://127.0.0.1:${entry.port}${path}${qs}`, {
+      method,
+      headers: c.req.raw.headers,
+      body: method === "GET" || method === "HEAD" ? undefined : c.req.raw.body,
+      // @ts-expect-error Node fetch streaming request body
+      duplex: "half",
+    });
+    return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
+  } catch (e: any) {
+    return c.json({ error: `ring proxy failed: ${e?.message ?? e}` }, 502);
   }
 });
 

@@ -86,7 +86,10 @@ export class ChainSync {
     }
     const leaves = await this.sql`SELECT idx, commitment FROM leaves ORDER BY idx`;
     for (const l of leaves) this.tree.insert(hexToField(l.commitment));
-    await this.syncOnce();
+    // Kick off the historical sweep in the BACKGROUND — the tree is already restored from the
+    // leaves cache above, so the ring can serve /health immediately while the chain catch-up
+    // (and any rate-limit backoff) runs behind it. Blocking here on a 429 would kill startup.
+    void this.syncOnce().catch((e) => console.error("[sync] initial sweep:", (e as Error)?.message ?? e));
     this.timer = setInterval(() => void this.syncOnce().catch(console.error), 1200);
   }
 
@@ -113,13 +116,38 @@ export class ChainSync {
 
       // Chunk the scan: public testnet RPCs (e.g. Alchemy free tier) cap eth_getLogs at a
       // small block range. SYNC_LOG_RANGE bounds each request; local anvil sets it huge.
-      const RANGE = BigInt(process.env.SYNC_LOG_RANGE ?? 50_000);
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      let range = BigInt(process.env.SYNC_LOG_RANGE ?? 50_000);
       while (fromBlock <= tip) {
-        const toBlock = fromBlock + RANGE - 1n < tip ? fromBlock + RANGE - 1n : tip;
-        const [leafLogs, settledLogs] = await Promise.all([
-          this.pub.getLogs({ address: this.cfg.registryAddr, event: LEAF_EVENT, fromBlock, toBlock }),
-          this.pub.getLogs({ address: this.cfg.registryAddr, event: SETTLED_EVENT, fromBlock, toBlock }),
-        ]);
+        let toBlock = fromBlock + range - 1n < tip ? fromBlock + range - 1n : tip;
+        // Resilient fetch: public RPCs (Alchemy free tier) rate-limit (429) and cap getLogs by
+        // result size. Back off on 429; shrink the window on a range/size error; never let either
+        // crash the sync (which would block ring startup — start() no longer awaits this).
+        let leafLogs!: Awaited<ReturnType<typeof this.pub.getLogs>>;
+        let settledLogs!: Awaited<ReturnType<typeof this.pub.getLogs>>;
+        for (let attempt = 0; ; attempt++) {
+          try {
+            [leafLogs, settledLogs] = await Promise.all([
+              this.pub.getLogs({ address: this.cfg.registryAddr, event: LEAF_EVENT, fromBlock, toBlock }),
+              this.pub.getLogs({ address: this.cfg.registryAddr, event: SETTLED_EVENT, fromBlock, toBlock }),
+            ]);
+            break;
+          } catch (e) {
+            const msg = String((e as Error)?.message ?? e).toLowerCase();
+            const rateLimited = msg.includes("429") || msg.includes("too many request") || msg.includes("rate limit");
+            const rangeTooBig = msg.includes("range") || msg.includes("too large") || msg.includes("response size") || msg.includes("more than") || msg.includes("limit exceeded");
+            if (rangeTooBig && range > 1n) {
+              range = range / 4n > 1n ? range / 4n : 1n;
+              toBlock = fromBlock + range - 1n < tip ? fromBlock + range - 1n : tip;
+              continue;
+            }
+            if (rateLimited && attempt < 10) {
+              await sleep(Math.min(8000, 400 * 2 ** attempt));
+              continue;
+            }
+            throw e;
+          }
+        }
 
         for (const log of leafLogs) {
           const idx = this.tree.insert(hexToField(log.args.commitment!));
@@ -131,6 +159,7 @@ export class ChainSync {
         // persist progress per chunk so a mid-scan failure resumes cleanly
         await this.sql`UPDATE sync_cursor SET last_block = ${Number(toBlock)} WHERE id = 1`;
         fromBlock = toBlock + 1n;
+        if (toBlock < tip) await sleep(60); // pace windows to stay under the RPC's rate limit
       }
     } finally {
       this.syncing = false;
