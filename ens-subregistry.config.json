@@ -1,0 +1,6 @@
+{
+  "label": "aragorn-sovereign",
+  "name": "aragorn-sovereign.eth",
+  "resolver": "0x0843Cd32F74e5E73D4Fd216dAe4FA4b1288E39Fc",
+  "childRegistry": "0x0F82660DaCC722BE248857DEceA6a50Fce7F65FD"
+}

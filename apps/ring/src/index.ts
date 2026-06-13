@@ -28,6 +28,34 @@ const bootstrapFlows = new Flows(cfg, sql, undefined as unknown as ChainSync, en
 const chain = new ChainSync(cfg, sql, encKeys, bootstrapFlows.partyXToLabel);
 const ens = new EnsDirectory(cfg.sepoliaRpcUrl, sql);
 const flows = new Flows(cfg, sql, chain, encKeys.publicKey, ens);
+
+// ENS v2 #3 — the Ring boots by reading its OWN name; ENS is the source of truth for
+// its public identity, config is the fallback. Secrets (enc priv, party keys) stay local;
+// what's on-chain (encpubkey, partyroot, modules) is verified against the local config.
+const selfId = await ens.resolveSelf(cfg.ringEns);
+if (selfId) {
+  const derivedEnc = `0x${Buffer.from(encKeys.publicKey).toString("hex")}`;
+  if (selfId.encPubkey.toLowerCase() !== derivedEnc.toLowerCase()) {
+    console.warn(
+      `[ring:${cfg.orgName}] ⚠ ENS encpubkey ${selfId.encPubkey.slice(0, 18)}… ≠ derived ${derivedEnc.slice(0, 18)}… — record/key mismatch`,
+    );
+  }
+  const partyXs = new Set(Object.keys(bootstrapFlows.partyXToLabel).map((x) => x.toLowerCase()));
+  if (!partyXs.has(selfId.partyRoot.toLowerCase())) {
+    console.warn(
+      `[ring:${cfg.orgName}] ⚠ ENS partyroot ${selfId.partyRoot.slice(0, 18)}… is not a party this Ring controls`,
+    );
+  }
+  if (selfId.modules) {
+    cfg.enabledModules = selfId.modules.split(",").map((m) => m.trim()).filter(Boolean);
+  }
+  console.log(
+    `[ring:${cfg.orgName}] identity: ENS ${cfg.ringEns} (modules from chain: ${cfg.enabledModules.join(",")})`,
+  );
+} else if (cfg.ringEns) {
+  console.log(`[ring:${cfg.orgName}] identity: config fallback (ENS ${cfg.ringEns} unresolved)`);
+}
+
 const auth = new AuthService(
   sql,
   cfg.biscuitRootPriv,

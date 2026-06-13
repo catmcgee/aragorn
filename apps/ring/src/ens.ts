@@ -40,6 +40,19 @@ export class EnsDirectory {
     return { ensName, encPubkey, endpoint: endpoint ?? "", partyRoot, modules: modules ?? "" };
   }
 
+  /** ENS v2 proposal #3 — the Ring resolves its OWN name at boot, so ENS is the
+   *  source of truth for its public identity (config is the fallback). Soft: returns
+   *  undefined if ENS is unconfigured or the RPC is unreachable, so boot never blocks. */
+  async resolveSelf(ensName: string | undefined): Promise<ResolvedOrg | undefined> {
+    if (!this.client || !ensName) return undefined;
+    try {
+      return await this.resolve(ensName);
+    } catch (e) {
+      console.warn(`[ens] self-resolve of ${ensName} failed (${(e as Error).message}); using config`);
+      return undefined;
+    }
+  }
+
   /** Whitelist an org by name: resolve now, persist the resolution. */
   async whitelist(ensName: string): Promise<ResolvedOrg> {
     const resolved = await this.resolve(ensName);

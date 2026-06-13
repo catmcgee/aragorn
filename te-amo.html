@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Para mi amorísima ♥</title>
+<style>
+  :root{
+    --ink:#2a1331;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#0b0220;font-family:"Georgia",ّ"Times New Roman",serif}
+
+  .scene{
+    position:fixed;inset:0;
+    background:linear-gradient(180deg,
+      #1a0b3d 0%,
+      #4a1d6e 22%,
+      #9b3b7a 45%,
+      #e26a6a 64%,
+      #f9a45c 78%,
+      #ffd89b 90%);
+    overflow:hidden;
+  }
+
+  /* ---- stars ---- */
+  .stars{position:absolute;inset:0;z-index:1}
+  .star{
+    position:absolute;width:2px;height:2px;border-radius:50%;
+    background:#fff;opacity:0;
+    animation:twinkle var(--d,3s) ease-in-out infinite;
+    animation-delay:var(--delay,0s);
+  }
+  @keyframes twinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:.9;transform:scale(1)}}
+
+  /* ---- sun ---- */
+  .sun{
+    position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
+    width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle,#fff6e0 0%,#ffe2a8 38%,#ffb55c 70%,rgba(255,150,90,0) 100%);
+    box-shadow:0 0 120px 40px rgba(255,190,120,.55);
+    z-index:2;animation:breathe 7s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.04)}}
+
+  /* ---- clouds ---- */
+  .cloud{
+    position:absolute;z-index:3;border-radius:100px;
+    background:rgba(255,225,210,.30);
+    filter:blur(8px);
+    animation:drift linear infinite;
+  }
+  .cloud::before,.cloud::after{content:"";position:absolute;background:inherit;border-radius:100px}
+  @keyframes drift{from{transform:translateX(-30vw)}to{transform:translateX(130vw)}}
+
+  /* ---- mountains ---- */
+  .range{position:absolute;left:0;width:100%;bottom:0;z-index:4}
+  svg{display:block;width:100%}
+
+  /* ---- water ---- */
+  .water{
+    position:absolute;left:0;bottom:0;width:100%;height:30%;z-index:5;
+    background:linear-gradient(180deg,#b6486f 0%,#6e2a63 55%,#341347 100%);
+    overflow:hidden;
+  }
+  .shimmer{
+    position:absolute;left:50%;top:0;transform:translateX(-50%);
+    width:240px;height:100%;
+    background:linear-gradient(180deg,rgba(255,220,170,.55),rgba(255,220,170,0));
+    filter:blur(6px);
+    animation:wobble 5s ease-in-out infinite;
+  }
+  @keyframes wobble{0%,100%{width:200px;opacity:.6}50%{width:280px;opacity:.9}}
+  .ripple{
+    position:absolute;left:0;width:100%;height:2px;background:rgba(255,255,255,.18);
+    border-radius:50%;animation:ripples 6s linear infinite;
+  }
+  @keyframes ripples{0%{opacity:0;transform:scaleX(.6)}40%{opacity:.7}100%{opacity:0;transform:scaleX(1.2)}}
+
+  /* ---- birds ---- */
+  .bird{position:absolute;z-index:4;font-size:18px;color:rgba(40,15,40,.55);animation:fly 18s linear infinite}
+  @keyframes fly{
+    0%{transform:translate(-10vw,0)}
+    50%{transform:translate(55vw,-6vh)}
+    100%{transform:translate(120vw,2vh)}
+  }
+
+  /* ---- message ---- */
+  .message{
+    position:absolute;inset:0;z-index:10;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:24px;pointer-events:none;
+  }
+  .kicker{
+    font-size:clamp(13px,2.4vw,18px);
+    letter-spacing:.5em;text-transform:uppercase;
+    color:#fff3e6;opacity:0;
+    text-shadow:0 2px 16px rgba(80,20,60,.6);
+    animation:rise 1.4s ease-out .3s forwards;
+  }
+  .te-amo{
+    margin:.15em 0 .05em;
+    font-size:clamp(44px,12vw,150px);
+    font-weight:700;line-height:.95;letter-spacing:.04em;
+    color:#fff;
+    text-shadow:0 0 30px rgba(255,180,140,.85),0 4px 26px rgba(120,30,80,.65);
+    opacity:0;animation:rise 1.6s cubic-bezier(.2,.8,.2,1) .6s forwards;
+  }
+  .amorisima{
+    font-style:italic;
+    font-size:clamp(28px,8vw,92px);
+    font-weight:700;letter-spacing:.06em;
+    background:linear-gradient(90deg,#fff0c2,#ffd6a0,#ff9ec0,#fff0c2);
+    background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 2px 30px rgba(255,160,180,.4);
+    opacity:0;animation:rise 1.6s cubic-bezier(.2,.8,.2,1) .95s forwards, shine 6s linear 2.4s infinite;
+  }
+  .sub{
+    margin-top:1.1em;font-size:clamp(13px,2.6vw,20px);font-style:italic;
+    color:#fff1e2;opacity:0;text-shadow:0 2px 14px rgba(80,20,60,.6);
+    animation:rise 1.4s ease-out 1.3s forwards;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes shine{to{background-position:300% 0}}
+
+  /* ---- floating hearts ---- */
+  .heart{position:absolute;bottom:-40px;z-index:9;color:#ff7aa8;opacity:0;
+    animation:float-up var(--fd,9s) linear infinite;font-size:var(--fs,20px);
+    text-shadow:0 0 12px rgba(255,120,170,.7)}
+  @keyframes float-up{
+    0%{opacity:0;transform:translateY(0) scale(.6) rotate(0)}
+    12%{opacity:.9}
+    100%{opacity:0;transform:translateY(-110vh) scale(1.1) rotate(40deg)}
+  }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="stars" id="stars"></div>
+  <div class="sun"></div>
+
+  <div class="cloud" style="top:14%;width:140px;height:34px;animation-duration:46s"></div>
+  <div class="cloud" style="top:24%;width:90px;height:24px;animation-duration:60s;animation-delay:-20s;opacity:.7"></div>
+  <div class="cloud" style="top:9%;width:180px;height:40px;animation-duration:75s;animation-delay:-40s;opacity:.5"></div>
+
+  <div class="bird" style="top:30%;animation-delay:0s">⌒</div>
+  <div class="bird" style="top:34%;animation-delay:-6s;font-size:14px">⌒</div>
+  <div class="bird" style="top:28%;animation-delay:-11s;font-size:12px">⌒</div>
+
+  <!-- far range -->
+  <div class="range" style="z-index:4;opacity:.55">
+    <svg viewBox="0 0 1440 320" preserveAspectRatio="none" height="44%">
+      <path fill="#6e2f6b" d="M0,220 L180,120 L340,210 L520,90 L700,200 L880,110 L1080,210 L1260,130 L1440,220 L1440,320 L0,320 Z"/>
+    </svg>
+  </div>
+  <!-- near range -->
+  <div class="range" style="z-index:4">
+    <svg viewBox="0 0 1440 320" preserveAspectRatio="none" height="40%">
+      <path fill="#3d1a4d" d="M0,260 L220,150 L430,250 L640,140 L860,250 L1080,160 L1280,255 L1440,180 L1440,320 L0,320 Z"/>
+    </svg>
+  </div>
+
+  <div class="water">
+    <div class="shimmer"></div>
+    <div class="ripple" style="top:30%;animation-delay:0s"></div>
+    <div class="ripple" style="top:50%;animation-delay:-2s"></div>
+    <div class="ripple" style="top:70%;animation-delay:-4s"></div>
+  </div>
+
+  <div class="message">
+    <div class="kicker">para ti</div>
+    <div class="te-amo">TE AMO</div>
+    <div class="amorisima">amorísima</div>
+    <div class="sub">eres mi paisaje favorito ♥</div>
+  </div>
+</div>
+
+<script>
+  // twinkling stars (only in the upper sky)
+  const sky = document.getElementById('stars');
+  for (let i = 0; i < 90; i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = Math.random()*100 + 'vw';
+    s.style.top  = Math.random()*48 + 'vh';
+    s.style.setProperty('--d', (2 + Math.random()*4) + 's');
+    s.style.setProperty('--delay', (Math.random()*5) + 's');
+    const sz = 1 + Math.random()*2;
+    s.style.width = sz+'px'; s.style.height = sz+'px';
+    sky.appendChild(s);
+  }
+  // floating hearts
+  const scene = document.querySelector('.scene');
+  function spawnHeart(){
+    const h = document.createElement('div');
+    h.className = 'heart';
+    h.textContent = '♥';
+    h.style.left = Math.random()*100 + 'vw';
+    h.style.setProperty('--fd', (7 + Math.random()*7) + 's');
+    h.style.setProperty('--fs', (14 + Math.random()*26) + 'px');
+    h.style.color = ['#ff7aa8','#ffb0c8','#ff9ec0','#ffd6a0'][Math.floor(Math.random()*4)];
+    scene.appendChild(h);
+    setTimeout(()=>h.remove(), 15000);
+  }
+  setInterval(spawnHeart, 900);
+  for (let i=0;i<6;i++) setTimeout(spawnHeart, i*400);
+</script>
+</body>
+</html>

@@ -31,6 +31,8 @@ export interface RingConfig {
   biscuitRootPriv?: string;
   emailDomainAllowlist: string[];
   sepoliaRpcUrl?: string;
+  /** the Ring's OWN ENS name — its on-chain identity (ENS v2 proposal #3) */
+  ringEns?: string;
   enabledModules: string[];
 }
 
@@ -68,6 +70,7 @@ export function loadConfig(): RingConfig {
       .map((d) => d.trim())
       .filter(Boolean),
     sepoliaRpcUrl: process.env.SEPOLIA_RPC_URL,
+    ringEns: process.env.RING_ENS,
     enabledModules: (process.env.ENABLED_MODULES ?? "payments,repo,payroll,issuance,strategies")
       .split(",")
       .map((m) => m.trim())
