@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRing } from "@/lib/ring";
 import { fmtMicro, shortHex, usdcToMicro } from "@/lib/format";
+import RoadmapBox from "@/components/RoadmapBox";
 
 const ROLES = ["admin", "trader", "approver", "viewer", "auditor", "employee"];
 
@@ -28,6 +29,22 @@ export default function AdminPage() {
       <UsersSection />
       <WhitelistSection />
       <OmsSection />
+
+      <div className="grid grid-cols-2 gap-4">
+        <RoadmapBox title="FROST quorum">
+          Threshold signing for the Ring&apos;s settlement key — t-of-n across
+          operator HSMs.
+        </RoadmapBox>
+        <RoadmapBox title="HSM">
+          Hardware-backed custody of note-encryption and viewing keys.
+        </RoadmapBox>
+        <RoadmapBox title="Safe link">
+          Bind the Ring&apos;s funding EOA to a Safe with policy guards.
+        </RoadmapBox>
+        <RoadmapBox title="Key rotation">
+          Rotate org keys without breaking historical viewing-key derivation.
+        </RoadmapBox>
+      </div>
     </div>
   );
 }
