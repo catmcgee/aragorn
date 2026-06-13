@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { createPublicClient, createWalletClient, http, getContract } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
+import { foundry, sepolia } from "viem/chains";
 import {
   NOTE_REGISTRY_ABI,
   TemplateId,
@@ -19,7 +19,8 @@ import {
 } from "../packages/protocol/src/index.ts";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8546";
-const OWNER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as const;
+const OWNER_KEY = (process.env.DEPLOYER_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as `0x${string}`;
+const CHAIN = process.env.CHAIN === "sepolia" ? sepolia : foundry;
 // UBS::trading party (gate key 0x112) + UBS org enc pubkey
 const HOLDER_PARTY_KEY = BigInt(process.env.HOLDER_PARTY_KEY ?? "0x112");
 const HOLDER_ENC_PUB = Buffer.from(
@@ -31,10 +32,10 @@ const FACE = BigInt(process.env.BOND_FACE_MICRO ?? 5_000_000_000_000n); // $5M
 await initPoseidon();
 await initSchnorr();
 
-const deployments = JSON.parse(readFileSync("contracts/deployments.local.json", "utf8"));
+const deployments = JSON.parse(readFileSync(process.env.DEPLOYMENTS ?? "contracts/deployments.local.json", "utf8"));
 const account = privateKeyToAccount(OWNER_KEY);
-const pub = createPublicClient({ chain: foundry, transport: http(RPC) });
-const wallet = createWalletClient({ account, chain: foundry, transport: http(RPC) });
+const pub = createPublicClient({ chain: CHAIN, transport: http(RPC) });
+const wallet = createWalletClient({ account, chain: CHAIN, transport: http(RPC) });
 
 const holder = derivePartyKeys(HOLDER_PARTY_KEY);
 const goldman = derivePartyKeys(0x999n); // illustrative issuer party

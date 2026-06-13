@@ -9,7 +9,7 @@ import {
   type WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
+import { foundry, sepolia } from "viem/chains";
 import {
   MerkleTree,
   commitment,
@@ -23,6 +23,10 @@ import {
 } from "@aragorn/protocol";
 import type { RingConfig } from "./config.ts";
 import type { Sql } from "./db.ts";
+
+// Settlement chain: local anvil by default, Sepolia when CHAIN=sepolia (so signed txs
+// carry the right chainId).
+const CHAIN = process.env.CHAIN === "sepolia" ? sepolia : foundry;
 
 const LEAF_EVENT = parseAbiItem(
   "event LeafInserted(uint32 indexed index, bytes32 commitment, bytes32 newRoot)",
@@ -52,10 +56,10 @@ export class ChainSync {
     /** party pubkey x (hex, lowercase) → party label, for owner attribution */
     private partyXToLabel: Record<string, string>,
   ) {
-    this.pub = createPublicClient({ chain: foundry, transport: http(cfg.rpcUrl) });
+    this.pub = createPublicClient({ chain: CHAIN, transport: http(cfg.rpcUrl) });
     const account = privateKeyToAccount(cfg.fundingEoaKey);
     this.fundingAddress = account.address;
-    this.fundingWallet = createWalletClient({ account, chain: foundry, transport: http(cfg.rpcUrl) });
+    this.fundingWallet = createWalletClient({ account, chain: CHAIN, transport: http(cfg.rpcUrl) });
   }
 
   on(fn: (e: RingEvent) => void): () => void {
@@ -74,6 +78,12 @@ export class ChainSync {
 
   /** Rebuild the in-memory tree from the projection, then start tailing. */
   async start(): Promise<void> {
+    // On a public testnet, start scanning at the contract's deploy block (not 0) so the
+    // first getLogs sweep is bounded. Only applies to a fresh cursor.
+    const start = process.env.SYNC_START_BLOCK ? Number(process.env.SYNC_START_BLOCK) : 0;
+    if (start > 0) {
+      await this.sql`UPDATE sync_cursor SET last_block = ${start - 1} WHERE id = 1 AND last_block = 0`;
+    }
     const leaves = await this.sql`SELECT idx, commitment FROM leaves ORDER BY idx`;
     for (const l of leaves) this.tree.insert(hexToField(l.commitment));
     await this.syncOnce();

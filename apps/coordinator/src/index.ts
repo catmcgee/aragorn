@@ -4,7 +4,8 @@
 import { Hono } from "hono";
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
+import { foundry, sepolia } from "viem/chains";
+const CHAIN = process.env.CHAIN === "sepolia" ? sepolia : foundry;
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8545";
 const RELAYER_KEY = (process.env.RELAYER_PRIVATE_KEY ??
@@ -16,8 +17,8 @@ const TOKENS: Record<string, string> = JSON.parse(
 );
 
 const account = privateKeyToAccount(RELAYER_KEY);
-const pub = createPublicClient({ chain: foundry, transport: http(RPC) });
-const wallet = createWalletClient({ account, chain: foundry, transport: http(RPC) });
+const pub = createPublicClient({ chain: CHAIN, transport: http(RPC) });
+const wallet = createWalletClient({ account, chain: CHAIN, transport: http(RPC) });
 
 // crude per-org rate limit: max 30 relays / 10s window
 const windows = new Map<string, number[]>();

@@ -14,14 +14,20 @@ import {
   toHex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
+import { foundry, sepolia } from "viem/chains";
 
+// Chain-agnostic: defaults to local anvil; for Sepolia set RPC_URL + DEPLOYER_KEY.
+// DEPLOY_OUT names the addresses file (deployments.local.json | deployments.sepolia.json).
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8546";
-const KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as const;
+const KEY = (process.env.DEPLOYER_KEY ??
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as `0x${string}`;
+const OUT = process.env.DEPLOY_OUT ?? "contracts/deployments.local.json";
 
 const account = privateKeyToAccount(KEY);
-const pub = createPublicClient({ chain: foundry, transport: http(RPC) });
-const wallet = createWalletClient({ account, chain: foundry, transport: http(RPC) });
+const pub = createPublicClient({ transport: http(RPC) });
+const chainId = await pub.getChainId();
+const chain = chainId === 11155111 ? sepolia : foundry;
+const wallet = createWalletClient({ account, chain, transport: http(RPC) });
 
 function artifact(file: string, name: string) {
   return JSON.parse(readFileSync(`contracts/out/${file}/${name}.json`, "utf8"));
@@ -59,6 +65,7 @@ async function send(to: `0x${string}`, abi: any, functionName: string, args: unk
   if (receipt.status !== "success") throw new Error(`${functionName} failed`);
 }
 
+const deployBlock = Number(await pub.getBlockNumber());
 const poseidon = await deploy("Poseidon2Yul.sol", "Poseidon2Yul_BN254");
 const usdc = await deploy("MockUSDC.sol", "MockUSDC");
 const vault = await deploy("ShieldVault.sol", "ShieldVault", [usdc]);
@@ -90,7 +97,7 @@ for (const [id, name] of VERIFIERS) {
 }
 
 writeFileSync(
-  "contracts/deployments.local.json",
-  JSON.stringify({ poseidon, usdc, vault, registry }, null, 2),
+  OUT,
+  JSON.stringify({ poseidon, usdc, vault, registry, chainId, deployBlock }, null, 2),
 );
-console.log("✅ deployed; addresses → contracts/deployments.local.json");
+console.log(`✅ deployed on chain ${chainId} (block ${deployBlock}); addresses → ${OUT}`);
