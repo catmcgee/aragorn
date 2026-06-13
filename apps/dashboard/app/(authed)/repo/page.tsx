@@ -42,13 +42,14 @@ interface Repo {
   created_at: string;
 }
 
-const STATUS_CHIP: Record<RepoStatus, string> = {
-  proposed: "bg-blue-500/15 text-blue-400",
-  inbound: "bg-amber-500/15 text-amber-400",
-  live: "bg-emerald-500/15 text-emerald-400",
-  closed: "bg-slate-500/15 text-slate-400",
-  pending_approval: "bg-orange-500/15 text-orange-400",
-  rejected: "bg-red-500/15 text-red-400",
+// Lifecycle as semantic status pill (PLAN §6.2).
+const STATUS_PILL: Record<RepoStatus, string> = {
+  proposed: "pill pill-held",
+  inbound: "pill pill-held",
+  live: "pill pill-held",
+  closed: "pill pill-pos",
+  pending_approval: "pill pill-neutral",
+  rejected: "pill pill-neutral",
 };
 
 const ZERO = 0n;
@@ -93,7 +94,7 @@ function bondFace(c: ContractRow): string {
 }
 
 export default function RepoPage() {
-  const { client, me, ringUrl, tick } = useRing();
+  const { client, me, ringUrl, tick, openPublic } = useRing();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [bonds, setBonds] = useState<ContractRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -197,10 +198,11 @@ export default function RepoPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="px-8 py-6 max-w-[1180px] space-y-6">
       <div>
+        <div className="page-eyebrow">Repo</div>
         <h1 className="page-title">
-          Repo <Term t="blotter">blotter</Term>
+          <Term t="blotter">Blotter</Term>
         </h1>
         <p className="page-caption">
           Book bilateral repos against bond collateral — both legs settle as
@@ -232,11 +234,11 @@ export default function RepoPage() {
               ))}
             </select>
           ) : (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-ink-5">
               No <Term t="encumbered">unencumbered</Term> bond positions.
             </p>
           )}
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-ink-5">
             No <Term t="haircut" /> in this demo — collateral pledged at face on
             the <Term t="on-leg" />.
           </p>
@@ -323,9 +325,9 @@ export default function RepoPage() {
           {booking ? "Booking…" : "Book repo"}
         </button>
 
-        {bookPending && <p className="text-sm text-amber-400">{bookPending}</p>}
+        {bookPending && <p className="text-sm text-gold-deep">{bookPending}</p>}
         {bookResult && (
-          <p className="font-mono text-sm text-emerald-400">{bookResult}</p>
+          <p className="font-mono text-sm text-pos">{bookResult}</p>
         )}
       </form>
 

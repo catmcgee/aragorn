@@ -15,17 +15,17 @@ import {
 import { privyConfigured } from "./providers";
 import { BorromeanMark, RingGlyph } from "@/components/rings";
 
-// Each entrance is a ring: UBS wears the gold accent, DRW the silver.
+// Each entrance is a ring: UBS wears the gold accent, DRW the steel.
 const RING_STYLE: Record<RingKey, { color: string; idle: string; selected: string }> = {
   ubs: {
-    color: "#c9a84c",
+    color: "#b08833",
     idle: "border-gold/35 hover:border-gold/70",
     selected: "border-gold bg-gold/[0.07]",
   },
   drw: {
-    color: "#aab2bd",
-    idle: "border-silver/30 hover:border-silver/60",
-    selected: "border-silver bg-silver/[0.07]",
+    color: "#1c4f68",
+    idle: "border-steel/30 hover:border-steel/60",
+    selected: "border-steel bg-steel/[0.07]",
   },
 };
 
@@ -72,13 +72,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center bg-ground px-6 py-12">
       <div className="mb-10 flex flex-col items-center text-center">
-        <BorromeanMark size={64} />
-        <h1 className="mt-6 text-xl font-semibold tracking-[0.45em] text-slate-100">
+        <BorromeanMark size={56} />
+        <h1 className="mt-6 text-xl font-semibold tracking-[0.3em] text-ink">
           ARAGORN
         </h1>
-        <p className="mt-2 text-[13px] text-slate-400">
+        <p className="mt-2 text-[13px] text-ink-5">
           Private institutional settlement on public Ethereum
         </p>
       </div>
@@ -93,7 +93,7 @@ export default function LoginPage() {
                 <button
                   key={k}
                   onClick={() => pickRing(k)}
-                  className={`flex flex-col items-center gap-2.5 rounded-sm border bg-slate-900/60 px-4 py-6 text-sm font-medium text-slate-200 transition-colors ${
+                  className={`flex flex-col items-center gap-2.5 rounded-xl border bg-paper px-4 py-6 text-sm font-medium text-ink-2 shadow-[0_1px_2px_rgb(20_30_45/0.04)] transition-colors ${
                     ring === k ? s.selected : s.idle
                   }`}
                 >
@@ -112,14 +112,14 @@ export default function LoginPage() {
             onToken={exchangePrivyToken}
           />
         ) : (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-5">
             Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID). Use a dev token
             below.
           </p>
         )}
 
-        <details className="border-t border-white/8 pt-4">
-          <summary className="cursor-pointer text-[10px] tracking-[0.18em] text-slate-600 uppercase transition-colors hover:text-slate-400">
+        <details className="border-t border-line-soft pt-4">
+          <summary className="cursor-pointer text-[10px] tracking-[0.18em] text-ink-6 uppercase transition-colors hover:text-ink-4">
             Developer
           </summary>
           <div className="mt-3">
