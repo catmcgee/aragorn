@@ -6,9 +6,17 @@
 import { createContext, useContext } from "react";
 import { RingClient, type Me } from "@aragorn/sdk";
 
+// Ring node endpoints. Default to the local demo stack; a hosted deploy points these at
+// public Ring URLs via NEXT_PUBLIC_* (a localhost backend is unreachable from an https site).
 export const RINGS = {
-  ubs: { label: "JP Morgan", url: "http://127.0.0.1:4001" },
-  drw: { label: "Goldman Sachs", url: "http://127.0.0.1:4002" },
+  ubs: {
+    label: "JP Morgan",
+    url: process.env.NEXT_PUBLIC_JPM_RING_URL ?? "http://127.0.0.1:4001",
+  },
+  drw: {
+    label: "Goldman Sachs",
+    url: process.env.NEXT_PUBLIC_GS_RING_URL ?? "http://127.0.0.1:4002",
+  },
 } as const;
 
 export type RingKey = keyof typeof RINGS;
