@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { HashChip } from "@/components/chips";
 
@@ -54,7 +55,7 @@ export default function AuditPage() {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
       setDownloadUrl(URL.createObjectURL(new Blob([json], { type: "application/json" })));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(cleanError(e));
     } finally {
       setBusy(false);
     }

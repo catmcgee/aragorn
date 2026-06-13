@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import type { ContractRow, Portfolio } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { fmtMicro, TEMPLATE_NAMES } from "@/lib/format";
@@ -56,11 +57,11 @@ export default function PortfolioPage() {
     client
       .portfolio()
       .then((p) => live && setPortfolio(p))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     client
       .contracts()
       .then((r) => live && setContracts(r.contracts))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };

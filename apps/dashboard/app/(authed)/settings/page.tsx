@@ -6,6 +6,7 @@
 // @aragorn/sdk yet, so raw authed fetch (same pattern as Repo / Payroll).
 
 import { useCallback, useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import { useRing, getStoredToken } from "@/lib/ring";
 import RoadmapBox, { RoadmapBadge } from "@/components/RoadmapBox";
 import { SettlementRing } from "@/components/rings";
@@ -83,7 +84,7 @@ export default function SettingsPage() {
   const load = useCallback(() => {
     settingsFetch(ringUrl, "GET")
       .then((r) => setModules((r.modules as ModuleRow[]) ?? []))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(cleanError(e)));
   }, [ringUrl]);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function SettingsPage() {
       load();
       await refreshMe(); // reveal/hide the module's nav item immediately
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(cleanError(e));
     } finally {
       setBusyKey(null);
     }

@@ -5,6 +5,7 @@
 // not in @aragorn/sdk yet, so this page uses raw authed fetch (same pattern as My Pay).
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import type { ContractRow } from "@aragorn/sdk";
 import { useRing, getStoredToken } from "@/lib/ring";
 import { fmtMicro, shortHex, usdcToMicro } from "@/lib/format";
@@ -119,7 +120,7 @@ export default function RepoPage() {
     let live = true;
     authedFetch(ringUrl, "/v1/repos")
       .then((r) => live && setRepos((r.repos as Repo[]) ?? []))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     client
       .contracts({ template: 2 })
       .then((r) => {
@@ -130,7 +131,7 @@ export default function RepoPage() {
           cur && free.some((b) => b.cid === cur) ? cur : (free[0]?.cid ?? ""),
         );
       })
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };
@@ -162,7 +163,7 @@ export default function RepoPage() {
       }
       setRefresh((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(cleanError(err));
     } finally {
       setBooking(false);
     }
@@ -175,7 +176,7 @@ export default function RepoPage() {
       setOutcomes((o) => ({ ...o, [id]: `Settled — tx ${res.txid}` }));
       setRefresh((n) => n + 1);
     } catch (e) {
-      setOutcomes((o) => ({ ...o, [id]: e instanceof Error ? e.message : String(e) }));
+      setOutcomes((o) => ({ ...o, [id]: cleanError(e) }));
     } finally {
       setBusyId(null);
     }
@@ -191,7 +192,7 @@ export default function RepoPage() {
       }));
       setRefresh((n) => n + 1);
     } catch (e) {
-      setOutcomes((o) => ({ ...o, [id]: e instanceof Error ? e.message : String(e) }));
+      setOutcomes((o) => ({ ...o, [id]: cleanError(e) }));
     } finally {
       setBusyId(null);
     }

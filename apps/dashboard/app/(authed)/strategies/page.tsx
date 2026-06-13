@@ -5,6 +5,7 @@
 // The strategies endpoints are not in @aragorn/sdk yet, so raw authed fetch.
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import { useRing, getStoredToken } from "@/lib/ring";
 import { fmtMicro, usdcToMicro } from "@/lib/format";
 import RoadmapBox from "@/components/RoadmapBox";
@@ -60,7 +61,7 @@ export default function StrategiesPage() {
     let live = true;
     authedFetch(ringUrl, "/v1/strategies")
       .then((r) => live && setData(r as unknown as Strategies))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };
@@ -83,7 +84,7 @@ export default function StrategiesPage() {
       else setWithdrawAmount("");
       setRefresh((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(cleanError(err));
     } finally {
       setBusy(null);
     }

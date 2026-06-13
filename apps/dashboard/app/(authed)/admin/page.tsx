@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { fmtMicro, shortHex, usdcToMicro } from "@/lib/format";
 import RoadmapBox from "@/components/RoadmapBox";
@@ -68,7 +69,7 @@ function UsersSection() {
     client
       .users()
       .then((r) => live && setUsers(r.users as Row[]))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };
@@ -92,7 +93,7 @@ function UsersSection() {
       setLimit("");
       setRefresh((n) => n + 1);
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : String(err));
+      setInviteError(cleanError(err));
     } finally {
       setBusy(false);
     }
@@ -209,7 +210,7 @@ function WhitelistSection() {
     client
       .whitelist()
       .then((r) => live && setRows(r.whitelist as Row[]))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };
@@ -226,7 +227,7 @@ function WhitelistSection() {
       setEnsName("");
       setRefresh((n) => n + 1);
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : String(err));
+      setAddError(cleanError(err));
     } finally {
       setBusy(false);
     }
@@ -320,7 +321,7 @@ function OmsSection() {
       const res = await client.serviceToken(parties, maxMicro, ttlSeconds);
       setBiscuit(res.biscuit);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(cleanError(err));
     } finally {
       setBusy(false);
     }

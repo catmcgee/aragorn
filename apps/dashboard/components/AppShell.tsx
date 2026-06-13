@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { Me, RingClient } from "@aragorn/sdk";
+import { cleanError, type Me, type RingClient } from "@aragorn/sdk";
 import {
   RingContext,
   clearAuth,
@@ -13,6 +13,9 @@ import {
 } from "@/lib/ring";
 import PublicFeed from "./PublicFeed";
 import { BorromeanMark } from "./rings";
+import WalletPopover from "./WalletPopover";
+
+const privyConfigured = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
 
 // Nav = capability ∩ enabledModules (PLAN §6 module model), grouped into the
 // sidebar sections from the Aragorn design. Core pages carry no module key;
@@ -81,6 +84,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -94,7 +98,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     client
       .me()
       .then(setMe)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(cleanError(e)));
   }, [router]);
 
   useEffect(() => {
@@ -217,8 +221,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
 
-          {/* Role footer */}
-          <div className="flex items-center gap-2.5 border-t border-line-soft px-3.5 py-2.5">
+          {/* Role footer — opens the wallet popover */}
+          <button
+            type="button"
+            className="flex items-center gap-2.5 border-t border-line-soft px-3.5 py-2.5 text-left transition-colors hover:bg-paper/60"
+            onClick={() => setWalletOpen((o) => !o)}
+            aria-haspopup="dialog"
+            aria-expanded={walletOpen}
+          >
             <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-line bg-ground-3 text-[10.5px] text-ink-3">
               {initials(me.user.email)}
             </div>
@@ -229,7 +239,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="rounded-md border border-steel/40 px-1.5 py-1 text-[9.5px] tracking-[0.06em] text-steel uppercase">
               {me.user.role}
             </span>
-          </div>
+          </button>
           <button
             className="border-t border-line-soft px-3.5 py-2 text-left text-[11px] text-ink-5 hover:text-ink-3"
             onClick={logout}
@@ -240,7 +250,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* ── Main + public panel ─────────────────────────────────────────── */}
         <main className="flex min-w-0 flex-1">
-          <section className="relative min-w-0 flex-1 overflow-auto">{children}</section>
+          <section className="relative min-w-0 flex-1 overflow-auto">
+            {/* faint gold Borromean watermark bleeding off the top-right (design line 85) */}
+            <svg
+              width="500"
+              height="500"
+              viewBox="0 0 400 400"
+              aria-hidden
+              className="pointer-events-none absolute -top-[66px] -right-[86px] z-0"
+            >
+              <g fill="none" stroke="#b08833" strokeWidth="1.3" strokeOpacity="0.16">
+                <circle cx="190" cy="150" r="120" />
+                <circle cx="270" cy="150" r="120" />
+                <circle cx="230" cy="240" r="120" />
+              </g>
+            </svg>
+            <div className="relative z-[1]">{children}</div>
+          </section>
 
           {drawerOpen && (
             <aside className="flex w-[39%] max-w-[540px] min-w-[350px] shrink-0 flex-col overflow-hidden border-l border-line bg-paper">
@@ -265,6 +291,42 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </aside>
           )}
         </main>
+
+        {/* ── Wallet popover ──────────────────────────────────────────────── */}
+        {walletOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setWalletOpen(false)}
+              aria-hidden
+            />
+            <div
+              role="dialog"
+              aria-label="Wallet"
+              className="fixed bottom-14 left-3 z-50 w-[220px] rounded-xl border border-line bg-paper p-3.5 shadow-[0_8px_28px_rgb(20_30_45/0.16)]"
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[11px] font-medium tracking-[0.06em] text-ink-3 uppercase">
+                  Wallet
+                </div>
+                <button
+                  className="flex h-5 w-5 items-center justify-center rounded text-ink-6 hover:text-ink"
+                  onClick={() => setWalletOpen(false)}
+                  aria-label="Close wallet"
+                >
+                  ×
+                </button>
+              </div>
+              {privyConfigured ? (
+                <WalletPopover onClose={() => setWalletOpen(false)} />
+              ) : (
+                <p className="text-[12px] text-ink-5">
+                  Signed in with a service token — no embedded wallet
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </RingContext.Provider>
   );

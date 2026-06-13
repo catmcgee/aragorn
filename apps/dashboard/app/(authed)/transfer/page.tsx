@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import type { TransferResult } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { usdcToMicro } from "@/lib/format";
@@ -49,7 +50,7 @@ export default function TransferPage() {
       const res = await client.transfer(from.trim(), to.trim(), micro);
       setResult(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(cleanError(err));
     } finally {
       setBusy(false);
     }

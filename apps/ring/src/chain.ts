@@ -97,25 +97,31 @@ export class ChainSync {
     this.syncing = true;
     try {
       const [{ last_block }] = await this.sql`SELECT last_block FROM sync_cursor WHERE id = 1`;
-      const fromBlock = BigInt(last_block) + 1n;
       const tip = await this.pub.getBlockNumber();
+      let fromBlock = BigInt(last_block) + 1n;
       if (tip < fromBlock) return;
 
-      const [leafLogs, settledLogs] = await Promise.all([
-        this.pub.getLogs({ address: this.cfg.registryAddr, event: LEAF_EVENT, fromBlock, toBlock: tip }),
-        this.pub.getLogs({ address: this.cfg.registryAddr, event: SETTLED_EVENT, fromBlock, toBlock: tip }),
-      ]);
+      // Chunk the scan: public testnet RPCs (e.g. Alchemy free tier) cap eth_getLogs at a
+      // small block range. SYNC_LOG_RANGE bounds each request; local anvil sets it huge.
+      const RANGE = BigInt(process.env.SYNC_LOG_RANGE ?? 50_000);
+      while (fromBlock <= tip) {
+        const toBlock = fromBlock + RANGE - 1n < tip ? fromBlock + RANGE - 1n : tip;
+        const [leafLogs, settledLogs] = await Promise.all([
+          this.pub.getLogs({ address: this.cfg.registryAddr, event: LEAF_EVENT, fromBlock, toBlock }),
+          this.pub.getLogs({ address: this.cfg.registryAddr, event: SETTLED_EVENT, fromBlock, toBlock }),
+        ]);
 
-      for (const log of leafLogs) {
-        const idx = this.tree.insert(hexToField(log.args.commitment!));
-        await this.sql`INSERT INTO leaves (idx, commitment) VALUES (${idx}, ${log.args.commitment!}) ON CONFLICT DO NOTHING`;
+        for (const log of leafLogs) {
+          const idx = this.tree.insert(hexToField(log.args.commitment!));
+          await this.sql`INSERT INTO leaves (idx, commitment) VALUES (${idx}, ${log.args.commitment!}) ON CONFLICT DO NOTHING`;
+        }
+        for (const log of settledLogs) {
+          await this.handleSettled(log.args, log.transactionHash!, log.blockNumber!);
+        }
+        // persist progress per chunk so a mid-scan failure resumes cleanly
+        await this.sql`UPDATE sync_cursor SET last_block = ${Number(toBlock)} WHERE id = 1`;
+        fromBlock = toBlock + 1n;
       }
-
-      for (const log of settledLogs) {
-        await this.handleSettled(log.args, log.transactionHash!, log.blockNumber!);
-      }
-
-      await this.sql`UPDATE sync_cursor SET last_block = ${tip} WHERE id = 1`;
     } finally {
       this.syncing = false;
     }

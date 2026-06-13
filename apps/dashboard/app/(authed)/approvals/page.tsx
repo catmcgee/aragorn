@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import type { Approval } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { fmtMicro } from "@/lib/format";
@@ -20,7 +21,7 @@ export default function ApprovalsPage() {
     client
       .approvals()
       .then((r) => live && setApprovals(r.approvals))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };
@@ -43,7 +44,7 @@ export default function ApprovalsPage() {
     } catch (e) {
       setOutcomes((o) => ({
         ...o,
-        [id]: e instanceof Error ? e.message : String(e),
+        [id]: cleanError(e),
       }));
     } finally {
       setBusyId(null);

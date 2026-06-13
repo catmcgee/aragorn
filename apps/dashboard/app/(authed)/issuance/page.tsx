@@ -5,6 +5,7 @@
 // coupon flows are designed but not shipped, so they render as Roadmap greys.
 
 import { useEffect, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import type { ContractRow } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import Amount from "@/components/Amount";
@@ -44,7 +45,7 @@ export default function IssuancePage() {
     client
       .contracts({ template: 2 })
       .then((r) => live && setBonds(r.contracts))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };

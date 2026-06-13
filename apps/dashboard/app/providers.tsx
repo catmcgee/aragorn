@@ -17,6 +17,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       config={{
         loginMethods: ["email"],
         appearance: { theme: "dark" },
+        // Privy v3 nests createOnLogin per chain family.
+        embeddedWallets: {
+          ethereum: { createOnLogin: "users-without-wallets" },
+        },
       }}
     >
       {children}

@@ -5,6 +5,7 @@
 // browser (web worker): the claim secret and amount never leave the device.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cleanError } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { getStoredToken } from "@/lib/ring";
 import { fmtMicro } from "@/lib/format";
@@ -80,7 +81,7 @@ export default function MyPayPage() {
       setClaimData(data as unknown as ClaimData);
       setPhase({ step: "ready" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(cleanError(e));
       setPhase({ step: "idle" });
     }
   }
@@ -118,7 +119,7 @@ export default function MyPayPage() {
         setPhase({ step: "claimed", txid: String(res.txid) });
         setClaimData(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(cleanError(err));
         setPhase({ step: "ready" });
       }
     };

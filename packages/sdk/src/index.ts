@@ -63,6 +63,73 @@ export class RingApiError extends Error {
   }
 }
 
+/** Pull the innermost human-readable string out of a possibly-nested error payload.
+ *  Ring/Privy errors arrive as `{"error":"..."}`, sometimes double-encoded as a JSON
+ *  string, and sometimes wrapped in a `prefix: {json}` shape from a fetch helper. */
+function unwrapErrorMessage(raw: string): string {
+  let msg = raw.trim();
+  // Strip a leading `something/path: ` or `prefix: ` before a JSON/text body.
+  // Only strip when the remainder looks like a body (starts with { or a quote).
+  const sep = msg.indexOf(": ");
+  if (sep > 0) {
+    const rest = msg.slice(sep + 2).trim();
+    if (rest.startsWith("{") || rest.startsWith('"') || rest.startsWith("[")) {
+      msg = rest;
+    }
+  }
+  // Unwrap nested JSON `{"error": ...}` up to a few levels (handles double-encoding).
+  for (let i = 0; i < 4; i++) {
+    const t = msg.trim();
+    if (!(t.startsWith("{") || t.startsWith('"'))) break;
+    try {
+      const parsed = JSON.parse(t);
+      if (typeof parsed === "string") {
+        msg = parsed;
+        continue;
+      }
+      if (parsed && typeof parsed === "object") {
+        const inner =
+          (parsed as any).error ?? (parsed as any).message ?? (parsed as any).detail;
+        if (typeof inner === "string") {
+          msg = inner;
+          continue;
+        }
+      }
+    } catch {
+      break;
+    }
+    break;
+  }
+  return msg.trim();
+}
+
+/** Turn any thrown error into a clean, one-line, user-facing message: unwrap nested
+ *  JSON, strip URLs, and map known backend conditions to friendly copy. Use this in
+ *  every catch that surfaces an error to the UI. */
+export function cleanError(e: unknown): string {
+  let msg =
+    e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
+  msg = unwrapErrorMessage(msg);
+  // Strip any leftover URLs (e.g. `https://node/api/v1/...`).
+  msg = msg.replace(/https?:\/\/\S+/g, "").trim();
+  // Strip a trailing/leading path fragment like `/api/v1/wallets/.../deposit:`.
+  msg = msg.replace(/(^|\s)\/[\w./-]+:\s*/g, " ").trim();
+
+  const lower = msg.toLowerCase();
+  if (lower.includes("insufficient balance") || lower.includes("insufficient funds")) {
+    return "Insufficient balance — fund the wallet to continue.";
+  }
+  if (msg.includes("CONTENTION") || lower.includes("contention")) {
+    return "Busy — another transaction touched this; retry.";
+  }
+  if (msg.includes("INSUFFICIENT_FUNDS")) {
+    return "Not enough shielded balance for this amount.";
+  }
+  // "no invite" and "not whitelisted" are already human — keep as-is.
+  if (!msg) return "Something went wrong.";
+  return msg;
+}
+
 export class RingClient {
   constructor(
     private baseUrl: string,
@@ -84,7 +151,11 @@ export class RingClient {
     });
     const json = (await res.json().catch(() => ({}))) as any;
     if (!res.ok && res.status !== 202) {
-      throw new RingApiError(json.error ?? `HTTP ${res.status}`, res.status);
+      const raw =
+        typeof json.error === "string" ? json.error : json.error != null
+          ? JSON.stringify(json.error)
+          : `HTTP ${res.status}`;
+      throw new RingApiError(unwrapErrorMessage(raw), res.status);
     }
     return json as T;
   }
