@@ -22,7 +22,7 @@ export default function AdminPage() {
   return (
     <div className="px-8 py-6 max-w-3xl space-y-6">
       <div>
-        <div className="page-eyebrow">Workspace</div>
+        <div className="page-eyebrow">Admin</div>
         <h1 className="page-title">Admin</h1>
       </div>
       <UsersSection />

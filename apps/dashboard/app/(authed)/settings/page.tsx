@@ -91,7 +91,7 @@ export default function SettingsPage() {
   }, [load]);
 
   if (!me.capabilities.includes("admin")) {
-    return <p className="text-sm text-slate-500">Settings are admin-only.</p>;
+    return <p className="px-8 py-6 text-sm text-ink-5">Settings are admin-only.</p>;
   }
 
   async function toggle(m: ModuleRow) {
@@ -109,8 +109,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
+    <div className="px-8 py-6 max-w-3xl space-y-6">
+      <div className="mb-1">
+        <div className="page-eyebrow">Settings</div>
         <h1 className="page-title">Settings</h1>
         <p className="page-caption">
           A Ring is core + modules. Compose yours from the businesses you run.
@@ -121,9 +122,9 @@ export default function SettingsPage() {
       <section className="card">
         <h2 className="section-title">Features</h2>
         {!modules ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-5">Loading…</p>
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line-soft">
             {modules.map((m) => {
               const meta = MODULE_META[m.key] ?? { name: m.key, desc: "" };
               return (
@@ -141,17 +142,17 @@ export default function SettingsPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-200">
+                      <span className="text-sm font-medium text-ink">
                         {meta.name}
                       </span>
                       {m.status === "roadmap" && <RoadmapBadge />}
                       {m.status === "partial" && (
-                        <span className="rounded-full border border-white/10 px-2 py-0.5 text-[9px] tracking-[0.16em] text-slate-400 uppercase">
+                        <span className="rounded-full border border-line px-2 py-0.5 text-[9px] tracking-[0.16em] text-ink-4 uppercase">
                           Flows greyed
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">{meta.desc}</p>
+                    <p className="mt-0.5 truncate text-xs text-ink-5">{meta.desc}</p>
                   </div>
                   <Toggle
                     checked={m.enabled}
@@ -164,7 +165,7 @@ export default function SettingsPage() {
             })}
           </ul>
         )}
-        <p className="mt-2 text-[11px] text-slate-500">
+        <p className="mt-2 text-[11px] text-ink-5">
           Toggling a roadmap module on reveals its preview in the nav — what it
           will do, in desk language, with its intended components honestly grey.
         </p>
@@ -225,12 +226,12 @@ function Toggle({
       disabled={busy}
       onClick={onChange}
       className={`relative h-[18px] w-8 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${
-        checked ? "border-gold/70 bg-gold/80" : "border-white/15 bg-white/[0.06]"
+        checked ? "border-steel bg-steel" : "border-line bg-ground-2"
       }`}
     >
       <span
         className={`absolute top-[2px] h-3 w-3 rounded-full transition-all ${
-          checked ? "left-[16px] bg-slate-950" : "left-[2px] bg-slate-400"
+          checked ? "left-[16px] bg-white" : "left-[2px] bg-ink-5"
         }`}
       />
     </button>

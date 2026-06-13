@@ -141,10 +141,11 @@ export default function MyPayPage() {
     phase.step === "submitting";
 
   return (
-    <div className="max-w-xl space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-100">My Pay</h1>
-        <p className="mt-1 text-sm text-slate-400">
+    <div className="px-8 py-6 max-w-xl">
+      <div className="mb-5">
+        <div className="page-eyebrow">My Pay</div>
+        <h1 className="page-title">My Pay</h1>
+        <p className="page-caption">
           Claim your salary with a zero-knowledge proof generated in this browser.
           Your salary amount never leaves this device.
         </p>
@@ -170,15 +171,15 @@ export default function MyPayPage() {
               Fetch claimable salary
             </button>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ink-5">
             Demo input — in production this comes from your session.
           </p>
         </div>
 
         {claimData && (
-          <div className="rounded border border-slate-800 bg-slate-950/60 p-4">
-            <p className="text-xs text-slate-400">Claimable salary</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-100">
+          <div className="rounded-md border border-line bg-ground p-4">
+            <p className="text-xs text-ink-4">Claimable salary</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-ink">
               {fmtMicro(claimData.amountMicro)}
             </p>
             <button
@@ -192,21 +193,25 @@ export default function MyPayPage() {
         )}
 
         {busy && (
-          <div className="flex items-center gap-3 rounded border border-slate-800 bg-slate-950/60 p-4">
-            <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-slate-700 border-t-slate-200" />
-            <p className="text-sm text-slate-300">{STATUS_TEXT[phase.step]}</p>
+          <div className="flex items-center gap-3 rounded-md border border-line bg-ground p-4">
+            <ProgressRing
+              fraction={STAGE_FRACTION[phase.step] ?? 0.1}
+              spinning
+              size={22}
+            />
+            <p className="text-sm text-ink-2">{STATUS_TEXT[phase.step]}</p>
           </div>
         )}
 
         {phase.step === "claimed" && (
-          <div className="rounded border border-emerald-900/60 bg-emerald-950/30 p-4">
-            <p className="text-sm font-medium text-emerald-400">
+          <div className="rounded-md border border-[#3f7d5c]/40 bg-[#3f7d5c]/[0.08] p-4">
+            <p className="text-sm font-medium text-pos">
               Salary claimed privately
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-ink-4">
               Proof was generated on this device; only the proof was submitted.
             </p>
-            <p className="mt-2 font-mono text-xs break-all text-slate-300">
+            <p className="mt-2 font-mono text-xs break-all text-ink-3">
               tx: {phase.txid}
             </p>
           </div>

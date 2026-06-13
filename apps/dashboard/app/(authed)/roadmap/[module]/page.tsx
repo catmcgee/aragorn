@@ -67,11 +67,11 @@ export default function RoadmapModulePage() {
 
   if (!preview) {
     return (
-      <div className="max-w-xl space-y-3">
+      <div className="px-8 py-6 max-w-xl space-y-3">
         <h1 className="page-title">Unknown module</h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-4">
           No preview for “{params.module}”.{" "}
-          <Link href="/settings" className="text-gold hover:text-gold-bright">
+          <Link href="/settings" className="text-gold hover:text-gold-soft">
             Back to Settings → Features
           </Link>
         </p>
@@ -80,8 +80,9 @@ export default function RoadmapModulePage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="px-8 py-6 max-w-3xl space-y-6">
       <div>
+        <div className="page-eyebrow">Roadmap</div>
         <div className="flex items-center gap-3">
           <h1 className="page-title">{preview.name}</h1>
           <RoadmapBadge />
@@ -89,7 +90,7 @@ export default function RoadmapModulePage() {
         <p className="page-caption">{preview.lede}</p>
       </div>
 
-      <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
+      <p className="max-w-2xl text-sm leading-relaxed text-ink-4">
         {preview.intent}
       </p>
 
@@ -102,9 +103,9 @@ export default function RoadmapModulePage() {
         ))}
       </div>
 
-      <p className="text-[11px] text-slate-600">
+      <p className="text-[11px] text-ink-5">
         Designed, not yet shipped — see EXPLORATION.md. Toggle this module off in{" "}
-        <Link href="/settings" className="text-slate-400 hover:text-slate-200">
+        <Link href="/settings" className="text-ink-4 hover:text-ink-2">
           Settings → Features
         </Link>{" "}
         to remove it from the nav.
