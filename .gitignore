@@ -16,3 +16,6 @@ spikes/**/target/
 .DS_Store
 proofs/
 .anvil-state/
+
+# Next.js generated
+apps/dashboard/next-env.d.ts
