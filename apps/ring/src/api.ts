@@ -108,6 +108,7 @@ export function buildApi(
       limitMicro: user.limitMicro?.toString() ?? null,
       org: cfg.orgName,
       ens: process.env.RING_ENS ?? null,
+      explorerBase: process.env.EXPLORER_BASE ?? null,
       enabledModules,
       capabilities: capabilitiesFor(user.role),
     });

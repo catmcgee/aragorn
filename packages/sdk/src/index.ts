@@ -9,6 +9,7 @@ export interface Me {
   ens: string | null;
   enabledModules: string[];
   capabilities: string[];
+  explorerBase?: string | null;
 }
 
 export interface Portfolio {
