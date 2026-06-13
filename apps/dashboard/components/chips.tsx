@@ -58,7 +58,7 @@ export function HashChip({
           <span className="text-ink-6">…</span>
         </>
       )}
-      {revealed && href && (
+      {href && (
         <a
           href={href}
           target="_blank"
@@ -72,6 +72,25 @@ export function HashChip({
       )}
       {copied && <span className="text-gold">copied</span>}
     </button>
+  );
+}
+
+/** A settlement note: a human label followed by its tx hash as a linked chip
+ *  (→ "View on Etherscan" when on a public chain). Use anywhere a flow reports a txid. */
+export function TxNote({
+  label,
+  txid,
+  className = "",
+}: {
+  label: string;
+  txid?: string | null;
+  className?: string;
+}) {
+  return (
+    <span className={`inline-flex flex-wrap items-center gap-1 ${className}`}>
+      {label}
+      {txid ? <HashChip value={txid} /> : null}
+    </span>
   );
 }
 

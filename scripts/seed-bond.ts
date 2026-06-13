@@ -27,7 +27,14 @@ const HOLDER_ENC_PUB = Buffer.from(
   (process.env.HOLDER_ENC_PUB ?? "0x7b4e909bbe7ffe44c465a220037d608ee35897d31ef972f07f74892cb0f73f13").replace("0x", ""),
   "hex",
 );
-const FACE = BigInt(process.env.BOND_FACE_MICRO ?? 5_000_000_000_000n); // $5M
+// A small book of unencumbered Treasury positions so multiple repos can be booked
+// (one bond = one repo until it closes; more free collateral = no "nothing to pledge" wall).
+// The first stays $5M (the demo repo books $5M cash against it); env override applies to it.
+const BONDS: Array<{ isin: string; face: bigint; label: string }> = [
+  { isin: "US91282CEZ-2Y", face: BigInt(process.env.BOND_FACE_MICRO ?? 5_000_000_000_000n), label: "UST 2Y" },
+  { isin: "US91282CFA-5Y", face: 10_000_000_000_000n, label: "UST 5Y" },
+  { isin: "US91282CFB-10Y", face: 7_500_000_000_000n, label: "UST 10Y" },
+];
 
 await initPoseidon();
 await initSchnorr();
@@ -39,27 +46,37 @@ const wallet = createWalletClient({ account, chain: CHAIN, transport: http(RPC) 
 
 const holder = derivePartyKeys(HOLDER_PARTY_KEY);
 const goldman = derivePartyKeys(0x999n); // illustrative issuer party
-const bond = newNote(
-  TemplateId.BondPosition,
-  {
-    owner_x: holder.x,
-    issuer_x: goldman.x,
-    isin_hash: stringHash("US91282CEZ-DEMO"),
-    face_amount: FACE,
-    encumbrance: 0n,
-  },
-  [holder.x, goldman.x],
-);
-const c = commitment(bond);
-const cts = encryptNoteFor([HOLDER_ENC_PUB], bond).map(
-  (u) => `0x${Buffer.from(u).toString("hex")}` as `0x${string}`,
-);
+
+const commitmentsHex: `0x${string}`[] = [];
+const ciphertexts: `0x${string}`[] = [];
+const summary: string[] = [];
+for (const b of BONDS) {
+  const bond = newNote(
+    TemplateId.BondPosition,
+    {
+      owner_x: holder.x,
+      issuer_x: goldman.x,
+      isin_hash: stringHash(b.isin),
+      face_amount: b.face,
+      encumbrance: 0n,
+    },
+    [holder.x, goldman.x],
+  );
+  const c = commitment(bond);
+  commitmentsHex.push(fieldToHex(c));
+  // each note's ciphertext(s); sync matches by recomputed commitment, so order is flexible
+  for (const u of encryptNoteFor([HOLDER_ENC_PUB], bond)) {
+    ciphertexts.push(`0x${Buffer.from(u).toString("hex")}` as `0x${string}`);
+  }
+  summary.push(`${b.label} $${Number(b.face / 1_000_000n).toLocaleString()} → ${fieldToHex(c).slice(0, 12)}…`);
+}
 
 const registry = getContract({
   address: deployments.registry,
   abi: NOTE_REGISTRY_ABI,
   client: { public: pub, wallet },
 });
-const hash = await registry.write.seedCommitments([[fieldToHex(c)], cts]);
+const hash = await registry.write.seedCommitments([commitmentsHex, ciphertexts]);
 await pub.waitForTransactionReceipt({ hash });
-console.log(`seeded bond ${fieldToHex(c)} (face $${Number(FACE / 1_000_000n).toLocaleString()}, issuer "US Treasury") tx=${hash}`);
+console.log(`seeded ${BONDS.length} bond positions (issuer "US Treasury") tx=${hash}`);
+for (const s of summary) console.log(`  · ${s}`);

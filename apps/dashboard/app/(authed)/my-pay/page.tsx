@@ -12,6 +12,7 @@ import { fmtMicro } from "@/lib/format";
 import type { ClaimData } from "@/lib/claimProver";
 import type { ProverResponse } from "@/workers/prover";
 import { ProgressRing } from "@/components/rings";
+import { HashChip } from "@/components/chips";
 
 // Proving stages as a closing ring — the fraction grows as the proof nears done.
 const STAGE_FRACTION: Record<string, number> = {
@@ -212,8 +213,8 @@ export default function MyPayPage() {
             <p className="mt-1 text-xs text-ink-4">
               Proof was generated on this device; only the proof was submitted.
             </p>
-            <p className="mt-2 font-mono text-xs break-all text-ink-3">
-              tx: {phase.txid}
+            <p className="mt-2 flex items-center gap-1 font-mono text-xs text-ink-3">
+              tx: <HashChip value={phase.txid} />
             </p>
           </div>
         )}

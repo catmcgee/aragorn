@@ -8,7 +8,7 @@ contracts/cache/
 contracts/out/
 contracts/broadcast/
 circuits/**/target/
-spikes/**/target/
+spikes/
 .env
 .env.local
 .env.*.local
@@ -19,3 +19,4 @@ proofs/
 
 # Next.js generated
 apps/dashboard/next-env.d.ts
+*.tsbuildinfo

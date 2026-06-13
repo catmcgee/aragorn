@@ -11,7 +11,7 @@ import { useRing, getStoredToken } from "@/lib/ring";
 import { fmtMicro, shortHex, usdcToMicro } from "@/lib/format";
 import Amount from "@/components/Amount";
 import Term from "@/components/Term";
-import { HashChip } from "@/components/chips";
+import { HashChip, TxNote } from "@/components/chips";
 import { RoadmapBadge } from "@/components/RoadmapBox";
 
 type RepoStatus =
@@ -109,12 +109,12 @@ export default function RepoPage() {
   const [rateBps, setRateBps] = useState("");
   const [days, setDays] = useState("1");
   const [booking, setBooking] = useState(false);
-  const [bookResult, setBookResult] = useState<string | null>(null);
+  const [bookResult, setBookResult] = useState<{ label: string; txid?: string } | null>(null);
   const [bookPending, setBookPending] = useState<string | null>(null);
 
   // per-row action state
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [outcomes, setOutcomes] = useState<Record<number, string>>({});
+  const [outcomes, setOutcomes] = useState<Record<number, { label: string; txid?: string }>>({});
 
   useEffect(() => {
     let live = true;
@@ -157,9 +157,10 @@ export default function RepoPage() {
           `Routed to approver — four-eyes (approval #${res.approvalId})`,
         );
       } else {
-        setBookResult(
-          `Proposed — tx ${res.txid}${res.proposalCid ? ` · proposal ${shortHex(String(res.proposalCid))}` : ""}`,
-        );
+        setBookResult({
+          label: `Proposed${res.proposalCid ? ` · proposal ${shortHex(String(res.proposalCid))} ·` : ""} tx`,
+          txid: String(res.txid),
+        });
       }
       setRefresh((n) => n + 1);
     } catch (err) {
@@ -173,10 +174,10 @@ export default function RepoPage() {
     setBusyId(id);
     try {
       const res = await authedFetch(ringUrl, `/v1/repos/${id}/accept`);
-      setOutcomes((o) => ({ ...o, [id]: `Settled — tx ${res.txid}` }));
+      setOutcomes((o) => ({ ...o, [id]: { label: "Settled — tx", txid: String(res.txid) } }));
       setRefresh((n) => n + 1);
     } catch (e) {
-      setOutcomes((o) => ({ ...o, [id]: cleanError(e) }));
+      setOutcomes((o) => ({ ...o, [id]: { label: cleanError(e) } }));
     } finally {
       setBusyId(null);
     }
@@ -188,11 +189,14 @@ export default function RepoPage() {
       const res = await authedFetch(ringUrl, `/v1/repos/${id}/close`);
       setOutcomes((o) => ({
         ...o,
-        [id]: `Closed — tx ${res.txid} · repurchase ${fmtMicro(res.repurchaseMicro as string)}`,
+        [id]: {
+          label: `Closed · repurchase ${fmtMicro(res.repurchaseMicro as string)} · tx`,
+          txid: String(res.txid),
+        },
       }));
       setRefresh((n) => n + 1);
     } catch (e) {
-      setOutcomes((o) => ({ ...o, [id]: cleanError(e) }));
+      setOutcomes((o) => ({ ...o, [id]: { label: cleanError(e) } }));
     } finally {
       setBusyId(null);
     }
@@ -328,7 +332,9 @@ export default function RepoPage() {
 
         {bookPending && <p className="text-sm text-gold-deep">{bookPending}</p>}
         {bookResult && (
-          <p className="font-mono text-sm text-pos">{bookResult}</p>
+          <p className="font-mono text-sm text-pos">
+            <TxNote label={bookResult.label} txid={bookResult.txid} />
+          </p>
         )}
       </form>
 
@@ -435,7 +441,7 @@ export default function RepoPage() {
                       )}
                       {outcomes[r.id] && (
                         <p className="mt-1 font-mono text-xs text-ink-4">
-                          {outcomes[r.id]}
+                          <TxNote label={outcomes[r.id].label} txid={outcomes[r.id].txid} />
                         </p>
                       )}
                     </td>

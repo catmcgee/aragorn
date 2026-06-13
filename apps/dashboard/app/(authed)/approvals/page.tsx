@@ -6,6 +6,7 @@ import type { Approval } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
 import { fmtMicro } from "@/lib/format";
 import { ApprovalRing } from "@/components/rings";
+import { TxNote } from "@/components/chips";
 
 export default function ApprovalsPage() {
   const { client, tick } = useRing();
@@ -13,7 +14,7 @@ export default function ApprovalsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   // last decide outcome per approval id (executed txid or error)
-  const [outcomes, setOutcomes] = useState<Record<number, string>>({});
+  const [outcomes, setOutcomes] = useState<Record<number, { label: string; txid?: string }>>({});
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
@@ -35,16 +36,14 @@ export default function ApprovalsPage() {
       setOutcomes((o) => ({
         ...o,
         [id]: res.txid
-          ? `Executed — tx ${res.txid}`
-          : approve
-            ? "Approved"
-            : "Rejected",
+          ? { label: "Executed — tx", txid: String(res.txid) }
+          : { label: approve ? "Approved" : "Rejected" },
       }));
       setRefresh((n) => n + 1);
     } catch (e) {
       setOutcomes((o) => ({
         ...o,
-        [id]: cleanError(e),
+        [id]: { label: cleanError(e) },
       }));
     } finally {
       setBusyId(null);
@@ -97,7 +96,7 @@ export default function ApprovalsPage() {
                 )}
                 {outcomes[a.id] && (
                   <p className="mt-1.5 font-mono text-xs text-ink-4">
-                    {outcomes[a.id]}
+                    <TxNote label={outcomes[a.id].label} txid={outcomes[a.id].txid} />
                   </p>
                 )}
               </div>

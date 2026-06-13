@@ -1,9 +1,0 @@
-{
-  "name": "provekit-booth",
-  "private": true,
-  "dependencies": {
-    "@atheonxyz/verity": "0.3.2-alpha",
-    "@noir-lang/acvm_js": "1.0.0-beta.11",
-    "@noir-lang/noir_js": "1.0.0-beta.11"
-  }
-}

@@ -75,7 +75,7 @@ export default function PayrollPage() {
     { employeeId: "", amount: "" },
   ]);
   const [running, setRunning] = useState(false);
-  const [runResult, setRunResult] = useState<string | null>(null);
+  const [runResult, setRunResult] = useState<{ label: string; txids: string[] } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -130,8 +130,8 @@ export default function PayrollPage() {
         payerParty: payerParty.trim(),
         payments,
       });
-      const txids = Array.isArray(res.txids) ? res.txids : [res.txids];
-      setRunResult(`Ran — tx ${txids.join(", ")}`);
+      const txids = (Array.isArray(res.txids) ? res.txids : [res.txids]).map(String);
+      setRunResult({ label: "Ran — tx", txids });
       setRows([{ employeeId: "", amount: "" }]);
       setRefresh((n) => n + 1);
     } catch (err) {
@@ -287,7 +287,12 @@ export default function PayrollPage() {
           </div>
 
           {runResult && (
-            <p className="font-mono text-sm text-pos">{runResult}</p>
+            <p className="flex flex-wrap items-center gap-1 font-mono text-sm text-pos">
+              {runResult.label}
+              {runResult.txids.map((t) => (
+                <HashChip key={t} value={t} />
+              ))}
+            </p>
           )}
         </form>
 
