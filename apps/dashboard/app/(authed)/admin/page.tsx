@@ -20,8 +20,11 @@ const str = (r: Row, ...keys: string[]): string => {
 
 export default function AdminPage() {
   return (
-    <div className="max-w-3xl space-y-6">
-      <h1 className="text-lg font-semibold text-slate-100">Admin</h1>
+    <div className="px-8 py-6 max-w-3xl space-y-6">
+      <div>
+        <div className="page-eyebrow">Workspace</div>
+        <h1 className="page-title">Admin</h1>
+      </div>
       <UsersSection />
       <WhitelistSection />
       <OmsSection />
@@ -83,11 +86,11 @@ function UsersSection() {
       <h2 className="section-title">Users</h2>
       {error && <p className="err">{error}</p>}
       {!users ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-ink-5">Loading…</p>
       ) : users.length === 0 ? (
-        <p className="text-sm text-slate-500">No users.</p>
+        <p className="text-sm text-ink-5">No users.</p>
       ) : (
-        <table className="w-full">
+        <table className="w-full border-collapse">
           <thead>
             <tr>
               <th className="th">Email</th>
@@ -100,7 +103,7 @@ function UsersSection() {
             {users.map((u, i) => {
               const limitRaw = (u.limitMicro ?? u.limit_micro) as string | null | undefined;
               return (
-                <tr key={i}>
+                <tr key={i} className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]">
                   <td className="td">{str(u, "email")}</td>
                   <td className="td">{str(u, "role")}</td>
                   <td className="td font-mono text-xs">{str(u, "actAs", "act_as")}</td>
@@ -114,8 +117,8 @@ function UsersSection() {
         </table>
       )}
 
-      <form className="space-y-3 border-t border-slate-800 pt-4" onSubmit={invite}>
-        <h3 className="text-xs font-medium text-slate-400 uppercase">Invite user</h3>
+      <form className="space-y-3 border-t border-line-soft pt-4" onSubmit={invite}>
+        <h3 className="text-xs font-medium text-ink-4 uppercase">Invite user</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label" htmlFor="inv-email">Email</label>
@@ -167,7 +170,7 @@ function UsersSection() {
           {busy ? "Inviting…" : "Invite"}
         </button>
         {inviteError && <p className="err">{inviteError}</p>}
-        {invited && <p className="text-sm text-emerald-400">{invited}</p>}
+        {invited && <p className="text-sm text-pos">{invited}</p>}
       </form>
     </section>
   );
@@ -217,11 +220,11 @@ function WhitelistSection() {
       <h2 className="section-title">Counterparty whitelist</h2>
       {error && <p className="err">{error}</p>}
       {!rows ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-ink-5">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-slate-500">No whitelisted counterparties.</p>
+        <p className="text-sm text-ink-5">No whitelisted counterparties.</p>
       ) : (
-        <table className="w-full">
+        <table className="w-full border-collapse">
           <thead>
             <tr>
               <th className="th">ENS name</th>
@@ -231,7 +234,7 @@ function WhitelistSection() {
           </thead>
           <tbody>
             {rows.map((w, i) => (
-              <tr key={i}>
+              <tr key={i} className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]">
                 <td className="td font-mono">{str(w, "ensName", "ens_name")}</td>
                 <td className="td font-mono text-xs">
                   {shortHex(str(w, "encPubkey", "enc_pubkey"), 14)}
@@ -245,7 +248,7 @@ function WhitelistSection() {
         </table>
       )}
 
-      <form className="flex items-end gap-2 border-t border-slate-800 pt-4" onSubmit={add}>
+      <form className="flex items-end gap-2 border-t border-line-soft pt-4" onSubmit={add}>
         <div className="flex-1">
           <label className="label" htmlFor="wl-ens">ENS name</label>
           <input
@@ -263,7 +266,7 @@ function WhitelistSection() {
       </form>
       {addError && <p className="err">{addError}</p>}
       {added && (
-        <p className="font-mono text-xs text-emerald-400">
+        <p className="font-mono text-xs text-pos">
           Added {added.ensName} — encpubkey {shortHex(added.encPubkey, 14)} · partyroot{" "}
           {shortHex(added.partyRoot, 14)}
         </p>
@@ -315,7 +318,7 @@ function OmsSection() {
   return (
     <section className="card space-y-4">
       <h2 className="section-title">Connect your OMS</h2>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-5">
         Mint a scoped service token (biscuit) for machine access — paste it into your order
         management system.
       </p>

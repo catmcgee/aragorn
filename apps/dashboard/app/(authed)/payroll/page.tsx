@@ -6,7 +6,8 @@
 
 import { useEffect, useState } from "react";
 import { useRing, getStoredToken } from "@/lib/ring";
-import { fmtMicro, shortHex, usdcToMicro } from "@/lib/format";
+import { fmtMicro, usdcToMicro } from "@/lib/format";
+import { HashChip } from "@/components/chips";
 
 interface Employee {
   id: number;
@@ -24,10 +25,10 @@ interface PayrollItem {
   subname_label: string;
 }
 
-const ITEM_CHIP: Record<PayrollItem["status"], string> = {
-  claimable: "bg-emerald-500/15 text-emerald-400",
-  claimed: "bg-slate-500/15 text-slate-400",
-  pending: "bg-amber-500/15 text-amber-400",
+const ITEM_PILL: Record<PayrollItem["status"], string> = {
+  claimable: "pill pill-held",
+  claimed: "pill pill-pos",
+  pending: "pill pill-neutral",
 };
 
 const MAX_ROWS = 3;
@@ -140,18 +141,21 @@ export default function PayrollPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-lg font-semibold text-slate-100">Payroll</h1>
+    <div className="px-8 py-6 max-w-[1180px] space-y-6">
+      <div>
+        <div className="page-eyebrow">Payroll</div>
+        <h1 className="page-title">Payroll</h1>
+      </div>
       {error && <p className="err">{error}</p>}
 
       <section className="card">
         <h2 className="section-title">Employees</h2>
         {!employees ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-5">Loading…</p>
         ) : employees.length === 0 ? (
-          <p className="text-sm text-slate-500">No employees.</p>
+          <p className="text-sm text-ink-5">No employees.</p>
         ) : (
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
               <tr>
                 <th className="th">#</th>
@@ -161,7 +165,10 @@ export default function PayrollPage() {
             </thead>
             <tbody>
               {employees.map((emp) => (
-                <tr key={emp.id}>
+                <tr
+                  key={emp.id}
+                  className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                >
                   <td className="td tabular-nums">{emp.id}</td>
                   <td className="td font-mono text-xs">
                     {emp.subname_label}.{ensSuffix}
@@ -279,17 +286,17 @@ export default function PayrollPage() {
           </div>
 
           {runResult && (
-            <p className="font-mono text-sm text-emerald-400">{runResult}</p>
+            <p className="font-mono text-sm text-pos">{runResult}</p>
           )}
         </form>
 
         <h3 className="section-title mt-6">Payroll items</h3>
         {!items ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-5">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-slate-500">No payroll items.</p>
+          <p className="text-sm text-ink-5">No payroll items.</p>
         ) : (
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
               <tr>
                 <th className="th">Subname</th>
@@ -300,22 +307,21 @@ export default function PayrollPage() {
             </thead>
             <tbody>
               {items.map((it) => (
-                <tr key={it.id}>
+                <tr
+                  key={it.id}
+                  className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                >
                   <td className="td font-mono text-xs">
                     {it.subname_label}.{ensSuffix}
                   </td>
                   <td className="td tabular-nums">{fmtMicro(it.amount_micro)}</td>
                   <td className="td">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        ITEM_CHIP[it.status] ?? "bg-slate-500/15 text-slate-400"
-                      }`}
-                    >
+                    <span className={ITEM_PILL[it.status] ?? "pill pill-neutral"}>
                       {it.status}
                     </span>
                   </td>
-                  <td className="td font-mono text-xs" title={it.entitlement_cid ?? undefined}>
-                    {shortHex(it.entitlement_cid)}
+                  <td className="td">
+                    <HashChip value={it.entitlement_cid} />
                   </td>
                 </tr>
               ))}

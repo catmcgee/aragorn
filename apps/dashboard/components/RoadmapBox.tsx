@@ -9,7 +9,7 @@ export function RoadmapBadge({ className = "" }: { className?: string }) {
       className={`tip badge-roadmap ${className}`}
       data-tip="Designed, not yet shipped — see EXPLORATION.md"
     >
-      Roadmap
+      soon
     </span>
   );
 }
@@ -26,12 +26,12 @@ export default function RoadmapBox({
   return (
     <section className={`roadmap-box ${className}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-medium tracking-[0.18em] text-slate-500 uppercase">
+        <h3 className="text-[11px] font-medium tracking-[0.18em] text-ink-5 uppercase">
           {title}
         </h3>
         <RoadmapBadge />
       </div>
-      {children && <div className="mt-3 text-sm text-slate-500">{children}</div>}
+      {children && <div className="mt-3 text-sm text-ink-5">{children}</div>}
     </section>
   );
 }
@@ -41,7 +41,7 @@ export function SkeletonRows({ widths = [82, 64, 73] }: { widths?: number[] }) {
   return (
     <div className="mt-3 space-y-1.5" aria-hidden>
       {widths.map((w, i) => (
-        <div key={i} className="h-1.5 rounded-full bg-white/[0.05]" style={{ width: `${w}%` }} />
+        <div key={i} className="h-1.5 rounded-full bg-ground-3" style={{ width: `${w}%` }} />
       ))}
     </div>
   );

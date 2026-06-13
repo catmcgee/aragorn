@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { useRing, getStoredToken } from "@/lib/ring";
 import { fmtMicro, usdcToMicro } from "@/lib/format";
+import RoadmapBox from "@/components/RoadmapBox";
 
 interface Strategies {
   earn: {
@@ -92,12 +93,15 @@ export default function StrategiesPage() {
   const roadmap = data?.roadmap.privateStrategies;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-lg font-semibold text-slate-100">Strategies</h1>
+    <div className="px-8 py-6 max-w-[1180px] space-y-6">
+      <div>
+        <div className="page-eyebrow">Strategies</div>
+        <h1 className="page-title">Strategies</h1>
+      </div>
       {error && <p className="err">{error}</p>}
 
       {!data ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-ink-5">Loading…</p>
       ) : (
         <div className="flex flex-wrap items-start gap-6">
           <section className="card w-full max-w-md space-y-4">
@@ -106,34 +110,34 @@ export default function StrategiesPage() {
             </h2>
 
             {!earn?.enabled ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-ink-5">
                 Earn not configured on this Ring.
               </p>
             ) : (
               <>
                 <div>
-                  <p className="text-xs text-slate-400">In vault</p>
-                  <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-100">
+                  <p className="text-xs text-ink-5">In vault</p>
+                  <p className="mt-1 text-3xl font-semibold tabular-nums text-ink">
                     {fmtMicro(earn.position?.assetsInVault)}
                   </p>
                 </div>
 
                 <dl className="grid grid-cols-3 gap-3 text-sm">
                   <div>
-                    <dt className="text-xs text-slate-400">Earned yield</dt>
-                    <dd className="mt-0.5 tabular-nums text-emerald-400">
+                    <dt className="text-xs text-ink-5">Earned yield</dt>
+                    <dd className="mt-0.5 tabular-nums text-pos">
                       {fmtMicro(earn.position?.earnedYield)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-400">APY</dt>
-                    <dd className="mt-0.5 tabular-nums text-slate-200">
+                    <dt className="text-xs text-ink-5">APY</dt>
+                    <dd className="mt-0.5 tabular-nums text-ink-2">
                       {earn.vault ? `${earn.vault.apyBps / 100}%` : "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-400">Vault TVL</dt>
-                    <dd className="mt-0.5 tabular-nums text-slate-200">
+                    <dt className="text-xs text-ink-5">Vault TVL</dt>
+                    <dd className="mt-0.5 tabular-nums text-ink-2">
                       {earn.vault
                         ? `$${Number(earn.vault.tvlUsd).toLocaleString()}`
                         : "—"}
@@ -193,23 +197,18 @@ export default function StrategiesPage() {
                   </button>
                 </form>
 
-                {notice && <p className="text-sm text-amber-400">{notice}</p>}
+                {notice && <p className="text-sm text-gold-deep">{notice}</p>}
               </>
             )}
           </section>
 
-          {/* Intentionally muted: roadmap teaser, not an active product surface. */}
-          <section className="card w-full max-w-md space-y-4 opacity-50">
-            <div className="flex items-center justify-between">
-              <h2 className="section-title mb-0">
-                {roadmap?.title ?? "Private strategies"} — Roadmap
-              </h2>
-              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
-                Roadmap
-              </span>
-            </div>
-            <p className="text-sm text-slate-400">{roadmap?.blurb}</p>
-            <div className="flex gap-2">
+          {/* Roadmap teaser — the one honest grey, beside the live Earn card. */}
+          <RoadmapBox
+            title={`${roadmap?.title ?? "Private strategies"} — soon`}
+            className="w-full max-w-md"
+          >
+            <p>{roadmap?.blurb}</p>
+            <div className="mt-3 flex gap-2">
               <button className="btn" disabled>
                 Morpho
               </button>
@@ -220,7 +219,7 @@ export default function StrategiesPage() {
                 Uniswap
               </button>
             </div>
-          </section>
+          </RoadmapBox>
         </div>
       )}
     </div>

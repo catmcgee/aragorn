@@ -2,16 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useRing } from "@/lib/ring";
+import { HashChip } from "@/components/chips";
 
 const MAX_LINES = 200;
 
+// Audit log entries are loosely typed; pull a commitment/txid and a label
+// out of whatever shape the ring returns.
+type LogRow = Record<string, unknown>;
+const pick = (r: LogRow, ...keys: string[]): string | undefined => {
+  for (const k of keys) {
+    const v = r[k];
+    if (typeof v === "string" && v) return v;
+    if (typeof v === "number") return String(v);
+  }
+  return undefined;
+};
+
 export default function AuditPage() {
-  const { client, me } = useRing();
+  const { client, me, openPublic } = useRing();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [log, setLog] = useState<LogRow[] | null>(null);
 
   useEffect(() => {
     return () => {
@@ -20,7 +34,11 @@ export default function AuditPage() {
   }, [downloadUrl]);
 
   if (!me.capabilities.includes("audit")) {
-    return <p className="text-sm text-slate-500">Not authorized for audit export.</p>;
+    return (
+      <p className="px-8 py-6 text-sm text-ink-5">
+        Not authorized for audit export.
+      </p>
+    );
   }
 
   async function exportPackage() {
@@ -28,6 +46,7 @@ export default function AuditPage() {
     setError(null);
     try {
       const pkg = await client.auditExport();
+      setLog(Array.isArray(pkg.auditLog) ? (pkg.auditLog as LogRow[]) : []);
       const json = JSON.stringify(pkg, null, 2);
       const lines = json.split("\n");
       setTruncated(lines.length > MAX_LINES);
@@ -42,8 +61,15 @@ export default function AuditPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-lg font-semibold text-slate-100">Audit</h1>
+    <div className="px-8 py-6 max-w-[1180px] space-y-6">
+      <div>
+        <div className="page-eyebrow">Audit</div>
+        <h1 className="page-title">Audit</h1>
+        <p className="page-caption">
+          Export the decrypted record — every commitment is anchored on public
+          Ethereum.
+        </p>
+      </div>
 
       <div className="card space-y-4">
         <div className="flex items-center gap-3">
@@ -57,20 +83,82 @@ export default function AuditPage() {
           )}
         </div>
         {error && <p className="err">{error}</p>}
-        {preview !== null && (
-          <div>
-            {truncated && (
-              <p className="mb-2 text-xs text-slate-500">
-                Showing first {MAX_LINES} lines — use the download link for the full package.
-              </p>
-            )}
-            <pre className="max-h-[32rem] overflow-auto rounded border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-400">
-              {preview}
-              {truncated ? "\n…" : ""}
-            </pre>
-          </div>
-        )}
       </div>
+
+      {/* Commitment log — each row opens what the world sees on-chain. */}
+      {log && log.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="h-[3px] w-4 rounded-sm bg-gold shrink-0" />
+            <span className="text-[11px] tracking-[0.14em] uppercase text-ink-4">
+              Commitments
+            </span>
+            <span className="text-[10.5px] text-ink-6">{log.length} entries</span>
+            <div className="flex-1 h-px bg-line-soft" />
+          </div>
+          <div className="card-flat overflow-hidden">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="th">Event</th>
+                  <th className="th">Commitment</th>
+                  <th className="th">When</th>
+                  <th className="th-num">Chain</th>
+                </tr>
+              </thead>
+              <tbody>
+                {log.map((row, i) => {
+                  const txid = pick(row, "txid", "tx", "commitment", "cid");
+                  const kind =
+                    pick(row, "kind", "type", "event", "action") ?? "—";
+                  const ts = pick(row, "ts", "at", "created_at", "timestamp");
+                  return (
+                    <tr
+                      key={i}
+                      className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                    >
+                      <td className="td">{kind}</td>
+                      <td className="td">
+                        {txid ? <HashChip value={txid} /> : "—"}
+                      </td>
+                      <td className="td text-xs text-ink-4">
+                        {ts
+                          ? Number.isFinite(Number(ts))
+                            ? new Date(Number(ts) * 1000).toLocaleString()
+                            : ts
+                          : "—"}
+                      </td>
+                      <td className="td-num">
+                        <button
+                          className="public-pill"
+                          onClick={() => openPublic(txid)}
+                        >
+                          ⊙ Public
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {preview !== null && (
+        <div className="card">
+          {truncated && (
+            <p className="mb-2 text-xs text-ink-5">
+              Showing first {MAX_LINES} lines — use the download link for the full
+              package.
+            </p>
+          )}
+          <pre className="max-h-[32rem] overflow-auto rounded-md border border-line bg-ground p-3 font-mono text-xs text-ink-3">
+            {preview}
+            {truncated ? "\n…" : ""}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

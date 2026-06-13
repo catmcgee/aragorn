@@ -51,8 +51,9 @@ export default function IssuancePage() {
   }, [client, tick]);
 
   return (
-    <div className="space-y-6">
+    <div className="px-8 py-6 max-w-[1180px] space-y-6">
       <div>
+        <div className="page-eyebrow">Registry</div>
         <h1 className="page-title">Issuance</h1>
         <p className="page-caption">
           The Registry — <Term t="registrar" /> view: terms and holder ledger of
@@ -64,11 +65,11 @@ export default function IssuancePage() {
       <section className="card">
         <h2 className="section-title">Registry</h2>
         {!bonds ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-5">Loading…</p>
         ) : bonds.length === 0 ? (
-          <p className="text-sm text-slate-500">No bond positions on this Ring.</p>
+          <p className="text-sm text-ink-5">No bond positions on this Ring.</p>
         ) : (
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
               <tr>
                 <th className="th">ISIN</th>
@@ -83,10 +84,13 @@ export default function IssuancePage() {
               {bonds.map((b) => {
                 const enc = isEncumbered(b);
                 return (
-                  <tr key={b.cid}>
+                  <tr
+                    key={b.cid}
+                    className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                  >
                     <td className="td">
                       <span className="flex items-center gap-2">
-                        <span className="font-mono text-[12px] text-slate-200">
+                        <span className="font-mono text-[12px] text-ink-2">
                           {DEMO_ISIN_LABEL}
                         </span>
                         <HashChip value={b.payload.isin_hash} />
@@ -102,16 +106,18 @@ export default function IssuancePage() {
                     <td className="td">
                       {enc ? (
                         <span className="flex items-center gap-2">
-                          <LockRing />
-                          <Term t="encumbered" />
+                          <span className="pill pill-enc">
+                            <LockRing size={12} />
+                            <Term t="encumbered" />
+                          </span>
                           <HashChip value={b.payload.encumbrance} />
                         </span>
                       ) : (
-                        <span className="text-slate-500">Unencumbered</span>
+                        <span className="text-ink-5">Unencumbered</span>
                       )}
                     </td>
                     <td className="td">
-                      <span className="inline-flex items-center gap-1.5 text-slate-300">
+                      <span className="inline-flex items-center gap-1.5 text-ink-3">
                         <SettlementRing
                           state={
                             b.status === "active"
@@ -132,7 +138,7 @@ export default function IssuancePage() {
           </table>
         )}
         {bonds && bonds.some(isEncumbered) && (
-          <p className="mt-3 text-[11px] text-slate-500">
+          <p className="mt-3 text-[11px] text-ink-5">
             Encumbered positions are pledged under a governing agreement — the
             chip names the agreement commitment. They cannot move until the{" "}
             <Term t="off-leg" /> releases them.
@@ -142,12 +148,12 @@ export default function IssuancePage() {
 
       <section className="roadmap-box">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[11px] font-medium tracking-[0.18em] text-slate-500 uppercase">
+          <h2 className="text-[11px] font-medium tracking-[0.18em] text-ink-5 uppercase">
             Registrar actions
           </h2>
           <RoadmapBadge />
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-ink-5">
           Primary issuance, <Term t="DvP" /> against cash, and coupon runs are
           designed into the protocol — the demo seeds the bond instead.
         </p>

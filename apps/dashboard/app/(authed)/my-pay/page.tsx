@@ -10,6 +10,16 @@ import { getStoredToken } from "@/lib/ring";
 import { fmtMicro } from "@/lib/format";
 import type { ClaimData } from "@/lib/claimProver";
 import type { ProverResponse } from "@/workers/prover";
+import { ProgressRing } from "@/components/rings";
+
+// Proving stages as a closing ring — the fraction grows as the proof nears done.
+const STAGE_FRACTION: Record<string, number> = {
+  fetching: 0.1,
+  "loading-circuit": 0.3,
+  "executing-witness": 0.55,
+  proving: 0.8,
+  submitting: 0.95,
+};
 
 type Phase =
   | { step: "idle" }
