@@ -1,115 +1,198 @@
 @import "tailwindcss";
 
-/* ── Aragorn visual identity (PLAN §6.2) ─────────────────────────────────────
-   "Bloomberg terminal calm, not crypto dashboard loud."
-   Graphite/near-black ground, ONE metallic accent (gold), hairline borders,
-   tabular numerals, small-caps section labels. The ring motif carries all
-   playfulness so the rest stays austere. */
+/* ── Aragorn visual identity — the "Aragorn.dc.html" design system ───────────
+   Light, card-based institutional terminal. TWO accents with strict roles:
+     • GOLD  (#b08833) — the rings: brand mark + every ring-as-story moment
+       (atomic settle, four-eyes, proving, lifecycle, encumbered lock band).
+     • STEEL (#1c4f68) — the interface: buttons, active nav, links, focus.
+   Cool-tinted structural greys (sidebar / table headers / chips); white cards
+   pop. Helvetica grotesk, tabular numerals, no hex anywhere in the product. */
 
 @theme {
-  /* Remap the slate scale onto graphite so every existing class re-themes. */
-  --color-slate-950: #0c0e12;
-  --color-slate-900: #11141b;
-  --color-slate-800: #1a1e27;
-  --color-slate-700: #272c38;
-  --color-slate-600: #3b4150;
-  --color-slate-500: #5d6373;
-  --color-slate-400: #8d93a1;
-  --color-slate-300: #b6bac3;
-  --color-slate-200: #d4d6dc;
-  --color-slate-100: #ebecef;
+  /* Ink scale — text, darkest → faint. Slate scale remapped onto it (INVERTED)
+     so legacy `text-slate-100` reads as dark ink on white, `bg-slate-900` as paper. */
+  --color-ink: #16181b; /* primary text / figures */
+  --color-ink-2: #2b2f36; /* body text */
+  --color-ink-3: #50555d; /* secondary */
+  --color-ink-4: #717880; /* tertiary / dept labels */
+  --color-ink-5: #8a9099; /* muted */
+  --color-ink-6: #9aa0a8; /* placeholder */
+  --color-ink-7: #aeb3b9; /* faint / disabled */
 
-  /* The single metallic accent. */
-  --color-gold: #c9a84c;
-  --color-gold-bright: #e0c06a;
-  --color-gold-dim: #8a7434;
-  --color-silver: #aab2bd;
+  --color-slate-950: #16181b;
+  --color-slate-900: #ffffff; /* card bg (legacy `bg-slate-900`) */
+  --color-slate-800: #f4f8fb;
+  --color-slate-700: #2b2f36;
+  --color-slate-600: #50555d;
+  --color-slate-500: #717880;
+  --color-slate-400: #8a9099;
+  --color-slate-300: #9aa0a8;
+  --color-slate-200: #2b2f36;
+  --color-slate-100: #16181b;
+  --color-slate-50: #16181b;
+
+  /* Surfaces */
+  --color-paper: #ffffff;
+  --color-ground: #f4f8fb; /* sidebar */
+  --color-ground-2: #edf2f7; /* table header */
+  --color-ground-3: #e6eef5; /* avatar / chip fill */
+
+  /* The two accents. */
+  --color-gold: #b08833;
+  --color-gold-deep: #94701d;
+  --color-gold-soft: #c79a3e;
+  --color-steel: #1c4f68;
+  --color-steel-soft: #2b6f90;
+
+  /* Semantic status. */
+  --color-pos: #3f7d5c; /* final / settled */
+  --color-neg: #b23b34; /* reject / error */
+
+  /* Hairlines (cool dark, low alpha). */
+  --color-line: rgb(23 32 42 / 0.1);
+  --color-line-soft: rgb(23 32 42 / 0.08);
 
   --font-sans:
-    "Avenir Next", "Avenir", "Seravek", "Segoe UI", "Helvetica Neue",
-    system-ui, sans-serif;
+    "Helvetica Neue", Helvetica, "Segoe UI", system-ui, sans-serif;
   --font-mono:
-    "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono",
-    Menlo, monospace;
+    ui-monospace, Menlo, "SF Mono", "JetBrains Mono", monospace;
 }
 
+html,
 body {
-  background-color: var(--color-slate-950);
-  /* A single faint gold bloom at the top of the terminal — atmosphere, not noise. */
-  background-image:
-    radial-gradient(1100px 380px at 50% -120px, rgb(201 168 76 / 0.05), transparent 70%);
-  background-attachment: fixed;
+  margin: 0;
+  padding: 0;
+  background: var(--color-paper);
+  color: var(--color-ink-2);
 }
-
-/* All amounts everywhere line up. */
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
 table {
   font-variant-numeric: tabular-nums;
 }
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(23 32 42 / 0.1);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
 @layer components {
+  /* White card with hairline + the design's signature soft shadow. */
   .card {
-    @apply rounded-sm border border-white/8 bg-slate-900 p-4;
+    @apply rounded-xl border border-line bg-paper p-4;
+    box-shadow: 0 1px 2px rgb(20 30 45 / 0.04);
   }
+  .card-flat {
+    @apply rounded-md border border-line bg-paper;
+  }
+
+  /* STEEL = the interface accent. */
   .btn {
-    @apply rounded-sm border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-slate-100 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink-3 transition-colors hover:border-steel/40 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply rounded-sm border border-gold/60 bg-gold/90 px-3 py-1.5 text-sm font-medium text-slate-950 transition-colors hover:bg-gold-bright disabled:cursor-not-allowed disabled:opacity-40;
+    @apply rounded-lg border border-steel bg-steel px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-steel-soft disabled:cursor-not-allowed disabled:opacity-40;
   }
   .input {
-    @apply rounded-sm border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-gold/50;
+    @apply rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-6 focus:border-steel/50;
   }
   .label {
-    @apply mb-1 block text-[10px] tracking-[0.14em] text-slate-500 uppercase;
+    @apply mb-1 block text-[10px] tracking-[0.14em] text-ink-5 uppercase;
   }
+
+  /* Tables — cool-tinted header, hairline rows. */
   .th {
-    @apply border-b border-white/8 px-3 py-2 text-left text-[10px] font-medium tracking-[0.14em] text-slate-500 uppercase;
+    @apply bg-ground-2 px-3.5 py-2 text-left text-[10px] font-medium tracking-[0.1em] text-ink-5 uppercase;
   }
   .th-num {
-    @apply border-b border-white/8 px-3 py-2 text-right text-[10px] font-medium tracking-[0.14em] text-slate-500 uppercase;
+    @apply bg-ground-2 px-3.5 py-2 text-right text-[10px] font-medium tracking-[0.1em] text-ink-5 uppercase;
   }
   .td {
-    @apply border-b border-white/5 px-3 py-2 text-sm;
+    @apply border-t border-line-soft px-3.5 py-2.5 text-[13px] text-ink-2;
   }
   .td-num {
-    @apply border-b border-white/5 px-3 py-2 text-right text-sm tabular-nums;
+    @apply border-t border-line-soft px-3.5 py-2.5 text-right text-[13px] tabular-nums text-ink;
   }
+
   .err {
-    @apply mt-2 text-sm text-red-400;
+    @apply mt-2 text-sm text-[#b23b34];
   }
   .section-title {
-    @apply mb-3 text-[11px] font-medium tracking-[0.18em] text-slate-400 uppercase;
+    @apply mb-3 text-[11px] font-medium tracking-[0.14em] text-ink-4 uppercase;
   }
   .page-title {
-    @apply text-lg font-semibold text-slate-100;
+    @apply text-[28px] font-semibold tracking-[-0.02em] text-ink;
+  }
+  .page-eyebrow {
+    @apply text-[13px] text-ink-5;
   }
   .page-caption {
-    @apply mt-1 text-sm text-slate-400;
+    @apply mt-1 text-sm text-ink-4;
   }
 
   /* Short monospace identifier chip — cids/txids never render as raw hex. */
   .chip {
-    @apply inline-flex max-w-full items-center gap-1 rounded-[3px] border border-white/10 bg-white/[0.04] px-1.5 py-px text-left font-mono text-[11px] tracking-tight text-slate-300 normal-case;
+    @apply inline-flex max-w-full items-center gap-1 rounded-[4px] border border-line bg-ground-2 px-1.5 py-px text-left font-mono text-[11px] tracking-tight text-ink-3 normal-case;
   }
   button.chip {
-    @apply cursor-pointer transition-colors hover:border-gold/40 hover:text-slate-100;
+    @apply cursor-pointer transition-colors hover:border-steel/40 hover:text-ink;
   }
 
-  /* Gold-outline Roadmap badge — every greyed element wears one. */
+  /* GOLD-outline "soon" badge — every greyed/roadmap element wears one. */
   .badge-roadmap {
-    @apply inline-flex shrink-0 items-center rounded-full border border-gold/50 px-2 py-0.5 text-[9px] font-medium tracking-[0.16em] text-gold uppercase;
+    @apply inline-flex shrink-0 items-center rounded-[3px] border border-line px-[5px] py-px text-[8px] font-medium tracking-[0.12em] text-ink-7 uppercase;
   }
   .roadmap-box {
-    @apply rounded-sm border border-white/[0.06] bg-white/[0.015] p-4;
+    @apply rounded-lg border border-dashed border-line bg-ground/40 p-4;
   }
 
-  .status-chip {
-    @apply rounded-full px-2 py-0.5 text-xs;
+  /* Steel-blue "Public" pill — the public-view affordance, beside transactions. */
+  .public-pill {
+    @apply inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-steel/35 bg-steel/[0.06] px-2.5 py-1 text-[11px] tracking-[0.02em] text-steel transition-colors hover:bg-steel/[0.12];
   }
 }
 
-/* ── CSS-only hover glossary (PLAN §6: "speak desk, deliberately") ─────────── */
+/* ── Status pill (semantic): green=final/settled, steel=held, gold=encumbered ─ */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 5px;
+}
+.pill-pos {
+  color: var(--color-pos);
+  border: 1px solid rgb(63 125 92 / 0.4);
+  background: rgb(63 125 92 / 0.09);
+}
+.pill-held {
+  color: var(--color-steel);
+  border: 1px solid rgb(28 79 104 / 0.42);
+  background: rgb(28 79 104 / 0.08);
+}
+.pill-enc {
+  color: var(--color-gold-deep);
+  border: 1px solid rgb(176 136 51 / 0.5);
+  background: rgb(176 136 51 / 0.08);
+}
+.pill-neutral {
+  color: var(--color-ink-4);
+  border: 1px solid rgb(23 32 42 / 0.15);
+  background: transparent;
+}
 
+/* ── CSS-only hover glossary (desk vocabulary) ──────────────────────────────── */
 .tip {
   position: relative;
 }
@@ -122,17 +205,15 @@ table {
   z-index: 60;
   width: max-content;
   max-width: 17rem;
-  padding: 6px 9px;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 3px;
-  background: #1a1e27;
-  box-shadow: 0 10px 28px rgb(0 0 0 / 0.55);
-  color: var(--color-slate-200);
+  padding: 7px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-ink);
+  box-shadow: 0 12px 30px rgb(20 30 45 / 0.18);
+  color: #f3f6f8;
   font-family: var(--font-sans);
   font-size: 11px;
-  font-weight: 400;
   line-height: 1.5;
-  letter-spacing: 0.01em;
   text-transform: none;
   white-space: normal;
   opacity: 0;
@@ -145,15 +226,13 @@ table {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
-
-/* Desk vocabulary: dotted underline, definition on hover. */
 .term {
   cursor: help;
-  border-bottom: 1px dotted rgb(201 168 76 / 0.55);
+  border-bottom: 1px dotted rgb(176 136 51 / 0.6);
   padding-bottom: 0.5px;
 }
 
-/* In-flight settlement arcs rotate slowly. */
+/* ── Ring animations (gold = ring-as-story) ─────────────────────────────────── */
 @keyframes ring-orbit {
   to {
     transform: rotate(360deg);
@@ -162,4 +241,51 @@ table {
 .ring-orbit {
   animation: ring-orbit 1.8s linear infinite;
   transform-origin: center;
+}
+@keyframes ar-draw {
+  from {
+    stroke-dashoffset: 163;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ar-il-l {
+  from {
+    transform: translateX(34px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes ar-il-r {
+  from {
+    transform: translateX(-34px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes ar-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ar-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

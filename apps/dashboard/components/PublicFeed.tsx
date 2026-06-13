@@ -38,16 +38,16 @@ export default function PublicFeed({ ringUrl }: { ringUrl: string }) {
   }, [ringUrl]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col">
-      <p className="mb-3 text-xs text-slate-500">
-        Unauthenticated feed — featureless commitments only. No parties, no
-        amounts, no terms.
+    <div className="flex h-full min-h-0 flex-1 flex-col px-5 py-4">
+      <p className="mb-3 text-xs leading-relaxed text-ink-5">
+        Featureless commitments only — no parties, no amounts, no terms. The world
+        sees rings, never what&apos;s inside them.
         {state === "error" && " (disconnected — retrying)"}
         {state === "connecting" && " (connecting…)"}
       </p>
       <div className="flex-1 space-y-1 overflow-y-auto">
         {rows.length === 0 && (
-          <p className="text-sm text-slate-600">No public events yet.</p>
+          <p className="text-sm text-ink-6">No public events yet.</p>
         )}
         {rows.map((e, i) => {
           const tx =
@@ -55,14 +55,24 @@ export default function PublicFeed({ ringUrl }: { ringUrl: string }) {
           return (
             <div
               key={i}
-              className="flex items-center gap-2 rounded-sm border border-white/5 bg-slate-950/60 px-2 py-1.5"
+              className="flex items-center gap-2 rounded-lg border border-line-soft bg-ground/60 px-2.5 py-2"
             >
               <GrayRing size={16} />
-              <span className="text-xs text-slate-400">{e.type ?? "settlement"}</span>
+              <span className="text-xs text-ink-4">{e.type ?? "settlement"}</span>
               <span className="chip">circuit #{String(e.circuit ?? e.circuitId ?? "?")}</span>
               <HashChip value={tx} />
-              <span className="ml-auto text-[11px] text-slate-500">
-                {e.status ?? "committed"}
+              <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-pos">
+                <svg width="11" height="11" viewBox="0 0 16 16">
+                  <path
+                    d="M4 8.5l2.5 2.5L12 5.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                verified
               </span>
             </div>
           );

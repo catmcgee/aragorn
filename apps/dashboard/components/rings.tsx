@@ -11,38 +11,31 @@
 //   GrayRing        what the public sees — a ring, never what's inside it.
 //   ProgressRing    a ring closing as a fraction completes (My Pay proving).
 
-const GOLD = "#c9a84c";
-const GOLD_BRIGHT = "#e0c06a";
-const GRAY = "#3b4150";
+const GOLD = "#b08833";
+const GOLD_BRIGHT = "#c79a3e";
+const GRAY = "#9aa0a8";
 
 export function BorromeanMark({
-  size = 22,
+  size = 30,
   className = "",
 }: {
   size?: number;
   className?: string;
 }) {
-  // Three rings, each passing under exactly one neighbour (gap in the stroke
-  // where the other ring crosses over) — a true Borromean weave.
-  const common = {
-    r: 5.4,
-    fill: "none",
-    strokeWidth: 1.5,
-    pathLength: 100,
-    strokeDasharray: "91 9",
-  } as const;
+  // The brand mark from Aragorn.dc.html: three plain gold rings in a triangle.
+  const sw = (1.7 * 30) / size + (size >= 30 ? 0 : 0); // keep stroke optically even
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 30 30"
       className={className}
       role="img"
       aria-label="Aragorn — three interlocked rings"
     >
-      <circle cx="12" cy="8.6" {...common} stroke={GOLD_BRIGHT} strokeDashoffset={57.5} />
-      <circle cx="8.9" cy="14.4" {...common} stroke={GOLD} strokeDashoffset={95} />
-      <circle cx="15.1" cy="14.4" {...common} stroke={GOLD} opacity={0.82} strokeDashoffset={28.5} />
+      <circle cx="11.5" cy="11.5" r="7.4" fill="none" stroke={GOLD} strokeWidth="1.7" />
+      <circle cx="18.5" cy="11.5" r="7.4" fill="none" stroke={GOLD} strokeWidth="1.7" />
+      <circle cx="15" cy="18" r="7.4" fill="none" stroke={GOLD} strokeWidth="1.7" />
     </svg>
   );
 }
@@ -112,7 +105,7 @@ export function ProgressRing({
       className={`inline-block shrink-0 ${className}`}
       aria-hidden
     >
-      <circle cx="8" cy="8" r="6" fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="1.6" />
+      <circle cx="8" cy="8" r="6" fill="none" stroke="rgb(23 32 42 / 0.1)" strokeWidth="1.6" />
       <g className={spinning ? "ring-orbit" : undefined}>
         <circle
           cx="8"
@@ -210,7 +203,7 @@ export function GrayRing({
       className={`inline-block shrink-0 ${className}`}
       aria-hidden
     >
-      <circle cx="8" cy="8" r="6" fill="none" stroke="#4a5160" strokeWidth="1.5" />
+      <circle cx="8" cy="8" r="6" fill="none" stroke="#9aa0a8" strokeWidth="1.5" />
     </svg>
   );
 }

@@ -14,9 +14,9 @@ import {
 import PublicFeed from "./PublicFeed";
 import { BorromeanMark } from "./rings";
 
-// Nav = capability ∩ enabledModules (PLAN §6 module model). Core pages carry
-// no module key; module pages appear only when the admin has switched the
-// module on in Settings → Features. Roadmap modules route to preview pages.
+// Nav = capability ∩ enabledModules (PLAN §6 module model), grouped into the
+// sidebar sections from the Aragorn design. Core pages carry no module key;
+// module pages appear only when the admin has the module switched on.
 interface NavItem {
   href: string;
   label: string;
@@ -24,24 +24,54 @@ interface NavItem {
   module?: string;
   roadmap?: boolean;
 }
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
 
-const NAV: NavItem[] = [
-  { href: "/portfolio", label: "Portfolio", cap: "portfolio" },
-  { href: "/transfer", label: "Transfer", cap: "transfer", module: "payments" },
-  { href: "/repo", label: "Repo", cap: "repo", module: "repo" },
-  { href: "/payroll", label: "Payroll", cap: "payroll", module: "payroll" },
-  { href: "/issuance", label: "Issuance", cap: "portfolio", module: "issuance" },
-  { href: "/strategies", label: "Strategies", cap: "strategies", module: "strategies" },
-  { href: "/roadmap/lending", label: "Lending", cap: "portfolio", module: "lending", roadmap: true },
-  { href: "/roadmap/fx", label: "FX", cap: "portfolio", module: "fx", roadmap: true },
-  { href: "/roadmap/compliance", label: "Compliance", cap: "portfolio", module: "compliance", roadmap: true },
-  { href: "/roadmap/reports", label: "Reports", cap: "portfolio", module: "reports", roadmap: true },
-  { href: "/my-pay", label: "My Pay", cap: "my-pay", module: "payroll" },
-  { href: "/approvals", label: "Approvals", cap: "approvals" },
-  { href: "/admin", label: "Admin", cap: "admin" },
-  { href: "/audit", label: "Audit", cap: "audit" },
-  { href: "/settings", label: "Settings", cap: "admin" },
+const GROUPS: NavGroup[] = [
+  {
+    label: "Essentials",
+    items: [
+      { href: "/portfolio", label: "Portfolio", cap: "portfolio" },
+      { href: "/transfer", label: "Transfer", cap: "transfer", module: "payments" },
+      { href: "/repo", label: "Blotter", cap: "repo", module: "repo" },
+      { href: "/strategies", label: "Strategies", cap: "strategies", module: "strategies" },
+      { href: "/my-pay", label: "My Pay", cap: "my-pay", module: "payroll" },
+    ],
+  },
+  {
+    label: "Markets",
+    items: [
+      { href: "/payroll", label: "Payroll", cap: "payroll", module: "payroll" },
+      { href: "/issuance", label: "Registry", cap: "portfolio", module: "issuance" },
+      { href: "/roadmap/lending", label: "Lending", cap: "portfolio", module: "lending", roadmap: true },
+      { href: "/roadmap/fx", label: "FX", cap: "portfolio", module: "fx", roadmap: true },
+    ],
+  },
+  {
+    label: "Governance",
+    items: [
+      { href: "/approvals", label: "Inbox", cap: "approvals" },
+      { href: "/roadmap/compliance", label: "Compliance", cap: "portfolio", module: "compliance", roadmap: true },
+      { href: "/roadmap/reports", label: "Reports", cap: "portfolio", module: "reports", roadmap: true },
+      { href: "/audit", label: "Audit", cap: "audit" },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { href: "/admin", label: "Admin", cap: "admin" },
+      { href: "/settings", label: "Settings", cap: "admin" },
+    ],
+  },
 ];
+
+function initials(email: string): string {
+  const name = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+  const parts = name.split(" ");
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || email[0]?.toUpperCase() || "·";
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -67,7 +97,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [router]);
 
-  // Live updates: one SSE subscription for the whole shell; pages refetch on tick.
   useEffect(() => {
     const client = clientRef.current;
     if (!me || !client) return;
@@ -87,6 +116,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setMe(await client.me());
   }, []);
 
+  const openPublic = useCallback(() => setDrawerOpen(true), []);
+
   function logout() {
     clearAuth();
     router.replace("/");
@@ -104,109 +135,136 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!me) {
-    return <main className="p-8 text-sm text-slate-500">Loading…</main>;
+    return <main className="p-8 text-sm text-ink-5">Loading…</main>;
   }
 
   const ringUrl = getRingUrl() ?? "";
-  const navItems = NAV.filter((n) => {
+  const allow = (n: NavItem) => {
     const capOk =
-      me.capabilities.includes(n.cap) ||
-      // demo convenience: admins can drive the My Pay flow too
-      (n.cap === "my-pay" && me.user.role === "admin");
+      me.capabilities.includes(n.cap) || (n.cap === "my-pay" && me.user.role === "admin");
     const modOk = !n.module || me.enabledModules.includes(n.module);
     return capOk && modOk;
-  });
+  };
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter(allow) })).filter(
+    (g) => g.items.length,
+  );
 
   return (
     <RingContext.Provider
-      value={{ client: clientRef.current!, me, ringUrl, tick, refreshMe, logout }}
+      value={{ client: clientRef.current!, me, ringUrl, tick, refreshMe, logout, openPublic }}
     >
-      <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between border-b border-white/8 bg-slate-900/70 px-4 py-2">
-          <div className="flex items-center gap-3">
-            <BorromeanMark size={24} />
-            <span className="text-[13px] font-semibold tracking-[0.32em] text-slate-100">
-              ARAGORN
-            </span>
-            <span className="h-3.5 w-px bg-white/10" aria-hidden />
-            <span className="text-sm text-slate-300">{me.org}</span>
-            {me.ens && (
-              <span className="font-mono text-[11px] text-gold-dim">{me.ens}</span>
-            )}
+      <div className="fixed inset-0 flex overflow-hidden bg-paper text-ink-2">
+        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+        <nav className="flex w-[236px] shrink-0 flex-col overflow-hidden border-r border-line-soft bg-ground">
+          {/* Brand block — bare gold rings + the org's ENS name */}
+          <div className="px-3.5 pt-3.5 pb-2.5">
+            <div className="flex items-center gap-2.5 rounded-xl border border-line bg-paper px-3 py-2.5 shadow-[0_1px_2px_rgb(20_30_45/0.04)]">
+              <BorromeanMark size={28} className="shrink-0" />
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="truncate text-[13px] font-medium text-ink">
+                  {me.ens ?? me.org.toLowerCase() + ".aragorn.eth"}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              className={`btn ${drawerOpen ? "border-gold/40 text-gold" : ""}`}
-              onClick={() => setDrawerOpen((o) => !o)}
-            >
-              Public view
-            </button>
-            <span className="text-sm text-slate-400">{me.user.email}</span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] tracking-[0.14em] text-slate-300 uppercase">
+
+          {/* Search affordance */}
+          <div className="px-3.5 pb-2.5">
+            <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
+              <svg width="14" height="14" viewBox="0 0 16 16" className="shrink-0 text-ink-6">
+                <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              <span className="flex-1 text-[12px] text-ink-6">Search</span>
+              <span className="rounded border border-line px-[5px] py-px text-[10px] text-ink-7">⌘F</span>
+            </div>
+          </div>
+
+          {/* Grouped nav */}
+          <div className="flex-1 overflow-auto py-0.5 pb-2">
+            {groups.map((g) => (
+              <div key={g.label}>
+                <div className="px-6 pt-3 pb-1.5 text-[10px] tracking-[0.16em] text-ink-6 uppercase">
+                  {g.label}
+                </div>
+                {g.items.map((n) => {
+                  const active =
+                    pathname === n.href ||
+                    (n.href !== "/" && pathname.startsWith(n.href + "/")) ||
+                    (n.href === "/repo" && pathname.startsWith("/repo"));
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      className={`mx-3 my-px flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-[13px] outline-none transition-colors ${
+                        active
+                          ? "border-line bg-paper font-medium text-ink shadow-[0_1px_2px_rgb(20_30_45/0.06)]"
+                          : n.roadmap
+                            ? "border-transparent text-ink-7 hover:bg-paper/60"
+                            : "border-transparent text-ink-3 hover:bg-paper/60"
+                      }`}
+                    >
+                      <i
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ background: active ? "#b08833" : "transparent" }}
+                      />
+                      <span className="flex-1">{n.label}</span>
+                      {n.roadmap && <span className="badge-roadmap">soon</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Role footer */}
+          <div className="flex items-center gap-2.5 border-t border-line-soft px-3.5 py-2.5">
+            <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-line bg-ground-3 text-[10.5px] text-ink-3">
+              {initials(me.user.email)}
+            </div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-[12px] text-ink">{me.user.email.split("@")[0]}</div>
+              <div className="truncate text-[10px] text-ink-5">{me.user.email}</div>
+            </div>
+            <span className="rounded-md border border-steel/40 px-1.5 py-1 text-[9.5px] tracking-[0.06em] text-steel uppercase">
               {me.user.role}
             </span>
-            <button className="btn" onClick={logout}>
-              Logout
-            </button>
           </div>
-        </header>
+          <button
+            className="border-t border-line-soft px-3.5 py-2 text-left text-[11px] text-ink-5 hover:text-ink-3"
+            onClick={logout}
+          >
+            Sign out
+          </button>
+        </nav>
 
-        <div className="flex flex-1">
-          <nav className="flex w-44 shrink-0 flex-col border-r border-white/8 bg-slate-900/40 p-3">
-            <ul className="space-y-0.5">
-              {navItems.map((n) => {
-                const active = pathname.startsWith(n.href);
-                return (
-                  <li key={n.href}>
-                    <Link
-                      href={n.href}
-                      className={`flex items-center justify-between rounded-sm border-l-2 px-3 py-1.5 text-sm transition-colors ${
-                        active
-                          ? "border-gold bg-white/[0.05] text-slate-100"
-                          : "border-transparent text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
-                      } ${n.roadmap && !active ? "text-slate-500" : ""}`}
-                    >
-                      {n.label}
-                      {n.roadmap && (
-                        <svg width="10" height="10" viewBox="0 0 16 16" aria-label="roadmap preview">
-                          <circle
-                            cx="8"
-                            cy="8"
-                            r="5.5"
-                            fill="none"
-                            stroke="#c9a84c"
-                            strokeWidth="1.4"
-                            strokeDasharray="2.6 2.8"
-                            opacity="0.7"
-                          />
-                        </svg>
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="mt-auto px-3 pt-6 text-[10px] text-slate-600 italic">
-              keep it secret, keep it safe.
-            </p>
-          </nav>
-
-          <main className="min-w-0 flex-1 p-6">{children}</main>
+        {/* ── Main + public panel ─────────────────────────────────────────── */}
+        <main className="flex min-w-0 flex-1">
+          <section className="relative min-w-0 flex-1 overflow-auto">{children}</section>
 
           {drawerOpen && (
-            <aside className="flex w-96 shrink-0 flex-col border-l border-white/8 bg-slate-900/70 p-4">
-              <div className="mb-1 flex items-center justify-between">
-                <h2 className="text-[11px] font-medium tracking-[0.18em] text-slate-300 uppercase">
-                  What the world sees
-                </h2>
-                <button className="btn" onClick={() => setDrawerOpen(false)}>
-                  Close
+            <aside className="flex w-[39%] max-w-[540px] min-w-[350px] shrink-0 flex-col overflow-hidden border-l border-line bg-paper">
+              <div className="flex items-center justify-between border-b border-line-soft px-5 py-3.5">
+                <div>
+                  <div className="text-[10px] tracking-[0.16em] text-ink-5 uppercase">
+                    What the world sees
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-ink-4">
+                    Public Ethereum · settlement contract
+                  </div>
+                </div>
+                <button
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-line text-ink-5 hover:text-ink"
+                  onClick={() => setDrawerOpen(false)}
+                  aria-label="Close public view"
+                >
+                  ×
                 </button>
               </div>
               <PublicFeed ringUrl={ringUrl} />
             </aside>
           )}
-        </div>
+        </main>
       </div>
     </RingContext.Provider>
   );

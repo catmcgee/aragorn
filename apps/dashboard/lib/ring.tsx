@@ -82,6 +82,8 @@ export interface RingContextValue {
   /** Re-fetch /me (e.g. after toggling modules in Settings → Features). */
   refreshMe: () => Promise<void>;
   logout: () => void;
+  /** Open the public-view panel — called from the ⊙ Public pill beside a transaction. */
+  openPublic: (txid?: string) => void;
 }
 
 export const RingContext = createContext<RingContextValue | null>(null);
