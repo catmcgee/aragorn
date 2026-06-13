@@ -37,8 +37,12 @@ for db in ring_ubs ring_drw; do
   docker exec aragorn-postgres psql -U aragorn -d postgres -q -c "CREATE DATABASE $db;"
 done
 
-echo "── deploy settlement stack to Sepolia (8 verifiers + registry — a few minutes, ~0.15 ETH)"
-RPC_URL="$RPC" DEPLOYER_KEY="$KEY" DEPLOY_OUT="contracts/deployments.sepolia.json" bun scripts/deploy.ts
+if grep -q '"chainId": 11155111' contracts/deployments.sepolia.json 2>/dev/null && [ "${REDEPLOY:-0}" != "1" ]; then
+  echo "── reusing existing Sepolia deployment (set REDEPLOY=1 to force a fresh deploy)"
+else
+  echo "── deploy settlement stack to Sepolia (8 verifiers + registry — a few minutes, ~0.15 ETH)"
+  RPC_URL="$RPC" DEPLOYER_KEY="$KEY" DEPLOY_OUT="contracts/deployments.sepolia.json" bun scripts/deploy.ts
+fi
 
 REGISTRY=$(python3 -c "import json;print(json.load(open('contracts/deployments.sepolia.json'))['registry'])")
 VAULT=$(python3 -c "import json;print(json.load(open('contracts/deployments.sepolia.json'))['vault'])")
@@ -50,36 +54,41 @@ echo "── mint demo USDC to the funding EOA ($ADDR)"
 cast send "$USDC" "mint(address,uint256)" "$ADDR" 100000000000000 --rpc-url "$RPC" --private-key "$KEY" >/dev/null
 echo "   minted \$100M MockUSDC"
 
-# shared Sepolia ring env (one funded key for relayer + funding; chunked, deploy-block start)
-COMMON="RPC_URL=$RPC NOTE_REGISTRY_ADDR=$REGISTRY USDC_ADDR=$USDC SHIELD_VAULT_ADDR=$VAULT \
-  RELAYER_URL=http://127.0.0.1:4900 SEPOLIA_RPC_URL=$SEPOLIA_RPC_URL \
-  PRIVY_APP_ID=${PRIVY_APP_ID:-} PRIVY_APP_SECRET=${PRIVY_APP_SECRET:-} \
-  CHAIN=sepolia FUNDING_EOA_PRIVATE_KEY=$KEY SYNC_START_BLOCK=$DEPLOY_BLOCK SYNC_LOG_RANGE=9 EXPLORER_BASE=$EXPLORER"
+# shared Sepolia ring env, exported so subshells inherit it (values with spaces are safe)
+export RPC_URL="$RPC" NOTE_REGISTRY_ADDR="$REGISTRY" USDC_ADDR="$USDC" SHIELD_VAULT_ADDR="$VAULT"
+export RELAYER_URL=http://127.0.0.1:4900 SEPOLIA_RPC_URL="$SEPOLIA_RPC_URL"
+export PRIVY_APP_ID="${PRIVY_APP_ID:-}" PRIVY_APP_SECRET="${PRIVY_APP_SECRET:-}"
+export CHAIN=sepolia FUNDING_EOA_PRIVATE_KEY="$KEY" SYNC_START_BLOCK="$DEPLOY_BLOCK" SYNC_LOG_RANGE=9 EXPLORER_BASE="$EXPLORER"
+NODE="node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts"
 
-echo "── coordinator (relayer = deployer, pays Sepolia gas)"
+echo "── coordinator (relayer = deployer, pays Sepolia gas; serves /provision)"
 RPC_URL="$RPC" CHAIN=sepolia PORT=4900 RELAYER_PRIVATE_KEY="$KEY" \
   RELAYER_TOKENS='{"ubs-relay-token":"JP Morgan","drw-relay-token":"Goldman Sachs"}' \
   bun apps/coordinator/src/index.ts & echo $! >> $PIDFILE
 
 echo "── rings (JP Morgan :4001, Goldman Sachs :4002) against Sepolia"
-eval "RING_ORG_NAME='JP Morgan' PORT=4001 RING_ENS=jpmorgan.aragornrings.eth \
-  DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_ubs \
-  RELAYER_TOKEN=ubs-relay-token API_TOKEN=ubs-api-token \
-  ORG_ENC_PRIV=0x1111111111111111111111111111111111111111111111111111111111111111 \
-  PARTY_KEYS='\''{\"treasury\":\"0x111\",\"trading\":\"0x112\"}'\'' \
-  BISCUIT_ROOT_PRIV=ed25519-private/1111111111111111111111111111111111111111111111111111111111111111 \
-  GATEWAY_SIGNER_KEY=0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba \
-  ENABLED_MODULES=payments,repo,payroll,issuance,strategies \
-  $COMMON node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts &" ; echo $! >> $PIDFILE
+(
+  export RING_ORG_NAME="JP Morgan" PORT=4001 RING_ENS=jpmorgan.aragornrings.eth
+  export DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_ubs
+  export RELAYER_TOKEN=ubs-relay-token API_TOKEN=ubs-api-token
+  export ORG_ENC_PRIV=0x1111111111111111111111111111111111111111111111111111111111111111
+  export PARTY_KEYS='{"treasury":"0x111","trading":"0x112"}'
+  export BISCUIT_ROOT_PRIV=ed25519-private/1111111111111111111111111111111111111111111111111111111111111111
+  export GATEWAY_SIGNER_KEY=0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba
+  export ENABLED_MODULES=payments,repo,payroll,issuance,strategies
+  exec $NODE
+) & echo $! >> $PIDFILE
 
-eval "RING_ORG_NAME='Goldman Sachs' PORT=4002 RING_ENS=goldman.aragornrings.eth \
-  DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_drw \
-  RELAYER_TOKEN=drw-relay-token API_TOKEN=drw-api-token \
-  ORG_ENC_PRIV=0x2222222222222222222222222222222222222222222222222222222222222222 \
-  PARTY_KEYS='\''{\"desk\":\"0x221\"}'\'' \
-  BISCUIT_ROOT_PRIV=ed25519-private/2222222222222222222222222222222222222222222222222222222222222222 \
-  ENABLED_MODULES=payments,repo,strategies \
-  $COMMON node --experimental-wasm-modules --experimental-transform-types --no-warnings apps/ring/src/index.ts &" ; echo $! >> $PIDFILE
+(
+  export RING_ORG_NAME="Goldman Sachs" PORT=4002 RING_ENS=goldman.aragornrings.eth
+  export DATABASE_URL=postgres://aragorn:aragorn@127.0.0.1:5434/ring_drw
+  export RELAYER_TOKEN=drw-relay-token API_TOKEN=drw-api-token
+  export ORG_ENC_PRIV=0x2222222222222222222222222222222222222222222222222222222222222222
+  export PARTY_KEYS='{"desk":"0x221"}'
+  export BISCUIT_ROOT_PRIV=ed25519-private/2222222222222222222222222222222222222222222222222222222222222222
+  export ENABLED_MODULES=payments,repo,strategies
+  exec $NODE
+) & echo $! >> $PIDFILE
 
 for p in 4900 4001 4002; do
   for i in $(seq 1 60); do curl -sf http://127.0.0.1:$p/health >/dev/null 2>&1 && break; sleep 0.5; [ "$i" = 60 ] && { echo "service :$p failed"; exit 1; }; done

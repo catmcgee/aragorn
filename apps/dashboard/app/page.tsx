@@ -11,13 +11,18 @@ import {
   type AccessibleRing,
   type RingKey,
   clearAuth,
+  enterCustomRing,
   enterRing,
   probeDevToken,
   probePrivy,
   storeDevToken,
 } from "@/lib/ring";
+import { cleanError } from "@aragorn/sdk";
 import { privyConfigured } from "./providers";
 import { BorromeanMark, RingGlyph } from "@/components/rings";
+
+const COORDINATOR_URL =
+  process.env.NEXT_PUBLIC_COORDINATOR_URL ?? "http://127.0.0.1:4900";
 
 type Phase = "signin" | "rings" | "onboard";
 
@@ -27,6 +32,9 @@ export default function LoginPage() {
   const [rings, setRings] = useState<AccessibleRing[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The signed-in identity's email, captured at login so onboarding can invite the founder.
+  // Undefined on the dev-token path (no email) — provisioning falls back to a slug address.
+  const [founderEmail, setFounderEmail] = useState<string | undefined>(undefined);
 
   // After authenticating, resolve accessible rings → the picker (which handles the
   // empty state). We don't jump straight into onboarding: "no rings" is often transient
@@ -36,8 +44,9 @@ export default function LoginPage() {
     setPhase("rings");
   }
 
-  async function onPrivyToken(privyToken: string) {
+  async function onPrivyToken(privyToken: string, email?: string) {
     clearAuth(); // a fresh Privy session shouldn't inherit a stale dev token
+    if (email) setFounderEmail(email);
     const found = await probePrivy(privyToken);
     resolveRings(found);
   }
@@ -107,6 +116,8 @@ export default function LoginPage() {
         <Onboard
           onCancel={() => setPhase(rings.length ? "rings" : "signin")}
           hasRings={rings.length > 0}
+          founderEmail={founderEmail}
+          onDone={() => router.push("/portfolio")}
         />
       )}
       </div>
@@ -127,7 +138,7 @@ function SignIn({
   busy: boolean;
   error: string | null;
   setError: (m: string | null) => void;
-  onPrivyToken: (t: string) => Promise<void>;
+  onPrivyToken: (t: string, email?: string) => Promise<void>;
   onDevToken: (t: string) => Promise<void>;
 }) {
   const [devToken, setDevToken] = useState("");
@@ -182,9 +193,9 @@ function PrivyButton({
   onToken,
 }: {
   onError: (m: string | null) => void;
-  onToken: (t: string) => Promise<void>;
+  onToken: (t: string, email?: string) => Promise<void>;
 }) {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
   const [busy, setBusy] = useState(false);
 
   async function exchange() {
@@ -192,7 +203,8 @@ function PrivyButton({
     try {
       const t = await getAccessToken();
       if (!t) throw new Error("no Privy access token");
-      await onToken(t);
+      const email = user?.email?.address ?? user?.google?.email ?? undefined;
+      await onToken(t, email);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -269,10 +281,56 @@ function RingPicker({
 }
 
 /* ── Create a Ring (onboarding) — the design's 3-step flow ────────────────── */
-function Onboard({ onCancel, hasRings }: { onCancel: () => void; hasRings: boolean }) {
+function Onboard({
+  onCancel,
+  hasRings,
+  founderEmail,
+  onDone,
+}: {
+  onCancel: () => void;
+  hasRings: boolean;
+  founderEmail?: string;
+  onDone: () => void;
+}) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const ens = `${(name || "your-institution").toLowerCase().replace(/[^a-z0-9-]+/g, "")}.aragorn.eth`;
+  const [error, setError] = useState<string | null>(null);
+  const slug = (name || "your-institution").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const ens = `${slug}.aragorn.eth`;
+
+  // Provision a REAL sovereign Ring through the coordinator: own process + DB + keys +
+  // ENS metadata. Takes ~1 min (ENS writes on Sepolia + node boot) — keep the spinner up.
+  async function provision() {
+    setError(null);
+    setStep(2);
+    try {
+      const email = founderEmail ?? `admin@${slug}.aragorn.eth`;
+      const res = await fetch(`${COORDINATOR_URL}/provision`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ orgName: name, founderEmail: email }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ringUrl?: string;
+        ens?: string;
+        apiToken?: string;
+        error?: string;
+      };
+      if (!res.ok || data.error || !data.ringUrl || !data.apiToken) {
+        throw new Error(data.error ?? `provisioning failed (HTTP ${res.status})`);
+      }
+      enterCustomRing({
+        url: data.ringUrl,
+        token: data.apiToken,
+        label: name,
+        ens: data.ens ?? ens,
+      });
+      onDone();
+    } catch (e) {
+      setError(cleanError(e));
+      setStep(1);
+    }
+  }
 
   return (
     <div className="space-y-5 text-center">
@@ -322,9 +380,10 @@ function Onboard({ onCancel, hasRings }: { onCancel: () => void; hasRings: boole
               </div>
             ))}
           </div>
-          <button className="btn-primary w-full" onClick={() => setStep(2)}>
+          <button className="btn-primary w-full" onClick={() => void provision()}>
             Create Ring
           </button>
+          {error && <p className="err">{error}</p>}
         </>
       )}
 
@@ -351,13 +410,9 @@ function Onboard({ onCancel, hasRings }: { onCancel: () => void; hasRings: boole
             private ledger node
           </p>
           <p className="mt-4 max-w-xs text-[11px] leading-relaxed text-ink-6">
-            In this preview, Rings are provisioned out of band by an operator
-            (<span className="font-mono">scripts/provision-ring.sh</span>). For the demo, sign
-            in to an existing Ring.
+            Generating keys, creating the ledger database, publishing ENS metadata, and
+            booting your sovereign node. This takes about a minute — keep this tab open.
           </p>
-          <button className="btn mt-5" onClick={onCancel}>
-            {hasRings ? "Back to your Rings" : "Back"}
-          </button>
         </div>
       )}
 

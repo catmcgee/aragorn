@@ -12,6 +12,8 @@
       "name": "@aragorn/coordinator",
       "version": "0.0.1",
       "dependencies": {
+        "@aragorn/protocol": "workspace:*",
+        "@noble/curves": "^2.2.0",
         "hono": "^4.12.25",
         "viem": "^2.52.2",
       },

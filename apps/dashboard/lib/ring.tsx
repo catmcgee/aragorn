@@ -23,7 +23,35 @@ export type RingKey = keyof typeof RINGS;
 
 const RING_STORAGE_KEY = "aragorn-ring";
 const DEV_TOKEN_KEY = "dev-token";
+const CUSTOM_RING_KEY = "aragorn-custom-ring";
 const biscuitKey = (ring: RingKey) => `aragorn-biscuit:${ring}`;
+
+/** A freshly provisioned Ring that isn't in the static RINGS map — stored locally so the
+ *  rest of the app (client singleton, token lookup) can treat it like any other ring. */
+export interface CustomRing {
+  url: string;
+  token: string;
+  label: string;
+  ens: string;
+}
+
+export function getCustomRing(): CustomRing | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(CUSTOM_RING_KEY);
+  if (!raw) return null;
+  try {
+    const r = JSON.parse(raw) as CustomRing;
+    return r.url && r.token ? r : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when the active ring is the locally-provisioned custom one. */
+export function isCustomActive(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(RING_STORAGE_KEY) === "custom" && !!getCustomRing();
+}
 
 export function getRingKey(): RingKey | null {
   if (typeof window === "undefined") return null;
@@ -35,14 +63,23 @@ export function setRingKey(ring: RingKey): void {
   localStorage.setItem(RING_STORAGE_KEY, ring);
 }
 
-export function getRingUrl(): string | null {
+/** The ring this identity is currently acting as — a static key or a custom URL. */
+export function getActiveRing(): { url: string; key: string } | null {
+  const custom = isCustomActive() ? getCustomRing() : null;
+  if (custom) return { url: custom.url, key: "custom" };
   const k = getRingKey();
-  return k ? RINGS[k].url : null;
+  return k ? { url: RINGS[k].url, key: k } : null;
 }
 
-/** Dev bypass token wins; otherwise the per-ring biscuit from the last exchange. */
+export function getRingUrl(): string | null {
+  return getActiveRing()?.url ?? null;
+}
+
+/** Dev bypass token wins; otherwise the custom ring's token, otherwise the per-ring
+ *  biscuit from the last exchange. */
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
+  if (isCustomActive()) return getCustomRing()!.token;
   const dev = localStorage.getItem(DEV_TOKEN_KEY);
   if (dev) return dev;
   const k = getRingKey();
@@ -61,10 +98,18 @@ export function storeBiscuitFor(ring: RingKey, biscuit: string): void {
 }
 
 /** Commit to a ring: make it active and force the client singleton to rebuild for it. */
-export function enterRing(ring: RingKey): void {
-  setRingKey(ring);
+export function enterRing(ring: RingKey | "custom"): void {
+  localStorage.setItem(RING_STORAGE_KEY, ring);
   singleton = null;
   singletonUrl = null;
+}
+
+/** Commit to a freshly provisioned Ring: persist it, make it active, and use its API
+ *  token (clear any stale dev token so the custom token wins). */
+export function enterCustomRing(ring: CustomRing): void {
+  localStorage.setItem(CUSTOM_RING_KEY, JSON.stringify(ring));
+  localStorage.removeItem(DEV_TOKEN_KEY);
+  enterRing("custom");
 }
 
 /** A ring this identity can actually access (resolved at login by probing the nodes). */
@@ -121,6 +166,11 @@ export function clearAuth(): void {
   localStorage.removeItem(DEV_TOKEN_KEY);
   const k = getRingKey();
   if (k) localStorage.removeItem(biscuitKey(k));
+  // A provisioned custom ring carries its own token — drop it too so logout fully resets.
+  if (isCustomActive()) {
+    localStorage.removeItem(CUSTOM_RING_KEY);
+    localStorage.removeItem(RING_STORAGE_KEY);
+  }
   singleton = null;
   singletonUrl = null;
 }
