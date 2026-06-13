@@ -349,98 +349,112 @@ export default function RepoPage() {
           </div>
         </div>
         {!repos ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-5">Loading…</p>
         ) : repos.length === 0 ? (
-          <p className="text-sm text-slate-500">No repos.</p>
+          <p className="text-sm text-ink-5">No repos.</p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="th">#</th>
-                <th className="th">Side</th>
-                <th className="th">Status</th>
-                <th className="th">Counterparty</th>
-                <th className="th-num">
-                  <Term t="notional">Principal</Term>
-                </th>
-                <th className="th-num">Rate</th>
-                <th className="th-num">Term</th>
-                <th className="th">
-                  <Term t="off-leg">Off-leg</Term>
-                </th>
-                <th className="th-num">Repurchase</th>
-                <th className="th" />
-              </tr>
-            </thead>
-            <tbody>
-              {repos.map((r) => (
-                <tr key={r.id}>
-                  <td className="td tabular-nums">{r.id}</td>
-                  <td className="td">{r.state.side ?? "—"}</td>
-                  <td className="td">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        STATUS_CHIP[r.status] ?? "bg-slate-500/15 text-slate-400"
-                      }`}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="td font-mono text-xs">
-                    {r.state.counterpartyEns ?? "—"}
-                  </td>
-                  <td className="td-num">
-                    <Amount micro={r.state.cashAmountMicro} />
-                  </td>
-                  <td className="td-num">
-                    {r.state.rateBps !== undefined
-                      ? `${r.state.rateBps / 100}%`
-                      : "—"}
-                  </td>
-                  <td className="td-num">
-                    {r.state.days !== undefined ? `${r.state.days}d` : "—"}
-                  </td>
-                  <td className="td text-xs">
-                    {r.state.maturityTs
-                      ? new Date(r.state.maturityTs * 1000).toLocaleString()
-                      : "—"}
-                  </td>
-                  <td className="td-num">
-                    {r.state.repurchaseMicro ? (
-                      <Amount micro={r.state.repurchaseMicro} />
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="td">
-                    {r.status === "inbound" && (
-                      <button
-                        className="btn whitespace-nowrap"
-                        disabled={busyId === r.id}
-                        onClick={() => accept(r.id)}
-                      >
-                        Accept — atomic <Term t="DvP" />
-                      </button>
-                    )}
-                    {r.status === "live" && (
-                      <button
-                        className="btn"
-                        disabled={busyId === r.id}
-                        onClick={() => close(r.id)}
-                      >
-                        Close now
-                      </button>
-                    )}
-                    {outcomes[r.id] && (
-                      <p className="mt-1 font-mono text-xs text-slate-400">
-                        {outcomes[r.id]}
-                      </p>
-                    )}
-                  </td>
+          <div className="card-flat overflow-hidden">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="th">#</th>
+                  <th className="th">Side</th>
+                  <th className="th">Status</th>
+                  <th className="th">Counterparty</th>
+                  <th className="th-num">
+                    <Term t="notional">Principal</Term>
+                  </th>
+                  <th className="th-num">Rate</th>
+                  <th className="th-num">Term</th>
+                  <th className="th">
+                    <Term t="off-leg">Off-leg</Term>
+                  </th>
+                  <th className="th-num">Repurchase</th>
+                  <th className="th" />
+                  <th className="th-num">Chain</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {repos.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                  >
+                    <td className="td tabular-nums">{r.id}</td>
+                    <td className="td">{r.state.side ?? "—"}</td>
+                    <td className="td">
+                      <span
+                        className={STATUS_PILL[r.status] ?? "pill pill-neutral"}
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="td">{r.state.counterpartyEns ?? "—"}</td>
+                    <td className="td-num">
+                      <Amount micro={r.state.cashAmountMicro} />
+                    </td>
+                    <td className="td-num">
+                      {r.state.rateBps !== undefined
+                        ? `${r.state.rateBps / 100}%`
+                        : "—"}
+                    </td>
+                    <td className="td-num">
+                      {r.state.days !== undefined ? `${r.state.days}d` : "—"}
+                    </td>
+                    <td className="td text-xs">
+                      {r.state.maturityTs
+                        ? new Date(r.state.maturityTs * 1000).toLocaleString()
+                        : "—"}
+                    </td>
+                    <td className="td-num">
+                      {r.state.repurchaseMicro ? (
+                        <Amount micro={r.state.repurchaseMicro} />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="td">
+                      {r.status === "inbound" && (
+                        <button
+                          className="btn whitespace-nowrap"
+                          disabled={busyId === r.id}
+                          onClick={() => accept(r.id)}
+                        >
+                          Accept — atomic <Term t="DvP" />
+                        </button>
+                      )}
+                      {r.status === "live" && (
+                        <button
+                          className="btn"
+                          disabled={busyId === r.id}
+                          onClick={() => close(r.id)}
+                        >
+                          Close now
+                        </button>
+                      )}
+                      {outcomes[r.id] && (
+                        <p className="mt-1 font-mono text-xs text-ink-4">
+                          {outcomes[r.id]}
+                        </p>
+                      )}
+                    </td>
+                    <td className="td-num">
+                      <button
+                        className="public-pill"
+                        onClick={() =>
+                          openPublic(
+                            r.state.agreementCid ?? r.state.proposalCid,
+                          )
+                        }
+                      >
+                        ⊙ Public
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

@@ -56,8 +56,9 @@ export default function TransferPage() {
   }
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="px-8 py-6 max-w-lg space-y-6">
       <div>
+        <div className="page-eyebrow">Payments</div>
         <h1 className="page-title">Transfer</h1>
         <p className="page-caption">
           Internal department transfers and Ring-to-Ring payments. Over-limit{" "}
@@ -141,14 +142,14 @@ export default function TransferPage() {
         {error && <p className="err">{error}</p>}
 
         {result?.status === "pending_approval" && (
-          <p className="flex items-center gap-2 text-sm text-amber-400">
+          <p className="flex items-center gap-2 text-sm text-gold-deep">
             <ApprovalRing status="pending" />
             Pending approval #{result.approvalId} — routed to an approver (
             <Term t="four-eyes" />)
           </p>
         )}
         {result?.txid && (
-          <p className="flex items-center gap-2 text-sm text-emerald-400">
+          <p className="flex items-center gap-2 text-sm text-pos">
             <SettlementRing state="final" title="final" />
             Settled — tx <HashChip value={result.txid} />
           </p>
