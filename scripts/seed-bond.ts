@@ -36,6 +36,12 @@ const BONDS: Array<{ isin: string; face: bigint; label: string }> = [
   { isin: "US91282CFB-10Y", face: 7_500_000_000_000n, label: "UST 10Y" },
 ];
 
+// Pre-deployed private strategy positions (Privy Earn principal claims), owned by Treasury,
+// so the Strategies page shows the private side populated next to the live vault stats.
+const TREASURY_PARTY_KEY = BigInt(process.env.TREASURY_PARTY_KEY ?? "0x111");
+const STRATEGY_VAULT = process.env.STRATEGY_VAULT_LABEL ?? "privy-earn";
+const STRATEGY_POSITIONS: bigint[] = [25_000_000_000n, 12_000_000_000n]; // $25k, $12k deployed
+
 await initPoseidon();
 await initSchnorr();
 
@@ -45,6 +51,7 @@ const pub = createPublicClient({ chain: CHAIN, transport: http(RPC) });
 const wallet = createWalletClient({ account, chain: CHAIN, transport: http(RPC) });
 
 const holder = derivePartyKeys(HOLDER_PARTY_KEY);
+const treasury = derivePartyKeys(TREASURY_PARTY_KEY);
 const goldman = derivePartyKeys(0x999n); // illustrative issuer party
 
 const commitmentsHex: `0x${string}`[] = [];
@@ -71,6 +78,22 @@ for (const b of BONDS) {
   summary.push(`${b.label} $${Number(b.face / 1_000_000n).toLocaleString()} → ${fieldToHex(c).slice(0, 12)}…`);
 }
 
+// Strategy positions (private Privy Earn principal claims) → Treasury
+const openTs = BigInt(Math.floor(Date.now() / 1000));
+for (const amount of STRATEGY_POSITIONS) {
+  const pos = newNote(
+    TemplateId.StrategyPosition,
+    { owner_x: treasury.x, vault_id_hash: stringHash(STRATEGY_VAULT), amount, open_ts: openTs },
+    [treasury.x],
+  );
+  const c = commitment(pos);
+  commitmentsHex.push(fieldToHex(c));
+  for (const u of encryptNoteFor([HOLDER_ENC_PUB], pos)) {
+    ciphertexts.push(`0x${Buffer.from(u).toString("hex")}` as `0x${string}`);
+  }
+  summary.push(`Strategy $${Number(amount / 1_000_000n).toLocaleString()} (Privy Earn) → ${fieldToHex(c).slice(0, 12)}…`);
+}
+
 const registry = getContract({
   address: deployments.registry,
   abi: NOTE_REGISTRY_ABI,
@@ -78,5 +101,5 @@ const registry = getContract({
 });
 const hash = await registry.write.seedCommitments([commitmentsHex, ciphertexts]);
 await pub.waitForTransactionReceipt({ hash });
-console.log(`seeded ${BONDS.length} bond positions (issuer "US Treasury") tx=${hash}`);
+console.log(`seeded ${BONDS.length} bond positions + ${STRATEGY_POSITIONS.length} strategy positions tx=${hash}`);
 for (const s of summary) console.log(`  · ${s}`);
