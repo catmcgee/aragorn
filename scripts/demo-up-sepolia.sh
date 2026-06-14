@@ -95,12 +95,18 @@ for p in 4900 4001 4002; do
 done
 echo "   services up"
 
-echo "── seed the US Treasury bond (real Sepolia tx)"
-RPC_URL="$RPC" DEPLOYER_KEY="$KEY" SEED_REGISTRY="$REGISTRY" \
-  DEPLOYMENTS=contracts/deployments.sepolia.json bun scripts/seed-bond.ts
+# SKIP_SEED=1 reuses an ALREADY-seeded registry: just bring the rings up to sync existing
+# state from chain (seedCommitments is one-shot, so re-seeding a used registry reverts).
+if [ "${SKIP_SEED:-0}" = "1" ]; then
+  echo "── SKIP_SEED=1 — not re-seeding; rings will sync existing Sepolia state"
+else
+  echo "── seed the US Treasury bond (real Sepolia tx)"
+  RPC_URL="$RPC" DEPLOYER_KEY="$KEY" SEED_REGISTRY="$REGISTRY" \
+    DEPLOYMENTS=contracts/deployments.sepolia.json bun scripts/seed-bond.ts
 
-echo "── seed demo state on Sepolia (real proofs + real settles — several minutes)"
-bun scripts/seed-demo.ts
+  echo "── seed demo state on Sepolia (real proofs + real settles — several minutes)"
+  bun scripts/seed-demo.ts
+fi
 
 echo ""
 echo "✅ SEPOLIA STACK UP — settlement live on Sepolia"

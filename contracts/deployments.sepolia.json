@@ -1,8 +1,8 @@
 {
-  "poseidon": "0x7d49f0ec0991f160b50b2f35565a9b70bea2d5f3",
-  "usdc": "0xd9e33cd154954045e40bd1de67f824c7ea06316c",
-  "vault": "0x3cbf4cafca00a0efc60235eec4c2bc3d482d4aad",
-  "registry": "0x629bba56dec5189aad7447612be618588d2c7811",
+  "poseidon": "0xb15cfa7390076585293ff1e6a19af2514b7a7cc0",
+  "usdc": "0xb206d40828eedd5e4e2faa5e84c1c1a5b8ec2543",
+  "vault": "0x46881c6289de3ee1a269c19961f91545b8acd796",
+  "registry": "0x9aae9ec8f3435824c812f0c8a6abd8c037ff821e",
   "chainId": 11155111,
-  "deployBlock": 11053903
+  "deployBlock": 11056738
 }

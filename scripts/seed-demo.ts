@@ -58,9 +58,10 @@ await UBS.shield("treasury", $(10_000_000));
 step("shield $10M → DRW::desk (proving…)");
 await DRW.shield("desk", $(10_000_000));
 
-// 5. payroll history (§10.5): one run, one claim. employees[0] = founder (the demo login) —
-// pay them but DON'T claim it, so the signed-in user has a live claimable salary in My Pay.
-step("payroll run: 4 employees (proving…)");
+// 5. payroll history (§10.5): one run (max 3 payments — fan-out arity), one claim.
+// employees[0] = founder (the demo login) — paid but NOT claimed, so the signed-in user
+// has a live claimable salary in My Pay.
+step("payroll run: 3 employees (proving…)");
 const employees = (await raw("ubs", "GET", "/v1/employees")).employees as { id: number }[];
 await raw("ubs", "POST", "/v1/payroll/run", {
   payerParty: "treasury",
@@ -68,7 +69,6 @@ await raw("ubs", "POST", "/v1/payroll/run", {
     { employeeId: employees[0].id, amountMicro: $(15_000).toString() }, // founder — left claimable
     { employeeId: employees[1].id, amountMicro: $(12_500).toString() },
     { employeeId: employees[2].id, amountMicro: $(9_800).toString() },
-    { employeeId: employees[3].id, amountMicro: $(11_200).toString() },
   ],
 });
 await new Promise((r) => setTimeout(r, 2500));
