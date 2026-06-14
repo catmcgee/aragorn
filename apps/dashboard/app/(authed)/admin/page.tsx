@@ -227,7 +227,7 @@ function WhitelistSection() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="th">ENS name</th>
+              <th className="th">Counterparty</th>
               <th className="th">Enc pubkey</th>
               <th className="th">Party root</th>
             </tr>
@@ -250,7 +250,7 @@ function WhitelistSection() {
 
       <form className="flex items-end gap-2 border-t border-line-soft pt-4" onSubmit={add}>
         <div className="flex-1">
-          <label className="label" htmlFor="wl-ens">ENS name</label>
+          <label className="label" htmlFor="wl-ens">Counterparty</label>
           <input
             id="wl-ens"
             required

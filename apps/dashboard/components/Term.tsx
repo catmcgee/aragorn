@@ -39,14 +39,21 @@ export default function Term({
   className?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number; below: boolean } | null>(null);
 
   function show() {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const max = window.innerWidth - EDGE_MARGIN;
-    setPos({ x: Math.min(Math.max(r.left + r.width / 2, EDGE_MARGIN), max), y: r.top });
+    // Flip below the term when there isn't room above (term near the top of the viewport),
+    // otherwise the tooltip clips off the top / into the browser chrome.
+    const below = r.top < 96;
+    setPos({
+      x: Math.min(Math.max(r.left + r.width / 2, EDGE_MARGIN), max),
+      y: below ? r.bottom + 8 : r.top - 8,
+      below,
+    });
   }
   const hide = () => setPos(null);
 
@@ -65,7 +72,15 @@ export default function Term({
       </span>
       {pos &&
         createPortal(
-          <span role="tooltip" className="term-tip" style={{ left: pos.x, top: pos.y - 8 }}>
+          <span
+            role="tooltip"
+            className="term-tip"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              transform: pos.below ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+            }}
+          >
             {GLOSSARY[t]}
           </span>,
           document.body,

@@ -55,7 +55,6 @@ const GROUPS: NavGroup[] = [
   {
     label: "Governance",
     items: [
-      { href: "/approvals", label: "Inbox", cap: "approvals" },
       { href: "/roadmap/compliance", label: "Compliance", cap: "portfolio", module: "compliance", roadmap: true },
       { href: "/roadmap/reports", label: "Reports", cap: "portfolio", module: "reports", roadmap: true },
       { href: "/audit", label: "Audit", cap: "audit" },
@@ -85,6 +84,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [tick, setTick] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [pendingInbox, setPendingInbox] = useState(0);
+  const [publicTx, setPublicTx] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -114,13 +115,34 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, [me]);
 
+  // Pending inbox (four-eyes approvals) count → drives the sidebar notification ring.
+  // Only the roles that can see approvals fetch it; refetched on approval_* events (tick).
+  useEffect(() => {
+    const client = clientRef.current;
+    if (!me || !client || !me.capabilities.includes("approvals")) {
+      setPendingInbox(0);
+      return;
+    }
+    let live = true;
+    client
+      .approvals()
+      .then((r) => live && setPendingInbox(r.approvals.filter((a) => a.status === "pending").length))
+      .catch(() => live && setPendingInbox(0));
+    return () => {
+      live = false;
+    };
+  }, [me, tick]);
+
   const refreshMe = useCallback(async () => {
     const client = clientRef.current;
     if (!client) return;
     setMe(await client.me());
   }, []);
 
-  const openPublic = useCallback(() => setDrawerOpen(true), []);
+  const openPublic = useCallback((txid?: string) => {
+    setPublicTx(txid ?? null);
+    setDrawerOpen(true);
+  }, []);
 
   function logout() {
     clearAuth();
@@ -172,16 +194,38 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Search affordance */}
+          {/* Inbox — four-eyes approvals; a gold ring appears when something is pending */}
           <div className="px-3.5 pb-2.5">
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
-              <svg width="14" height="14" viewBox="0 0 16 16" className="shrink-0 text-ink-6">
-                <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-                <path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-              <span className="flex-1 text-[12px] text-ink-6">Search</span>
-              <span className="rounded border border-line px-[5px] py-px text-[10px] text-ink-7">⌘F</span>
-            </div>
+            <Link
+              href="/approvals"
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${
+                pathname.startsWith("/approvals")
+                  ? "border-line bg-paper shadow-[0_1px_2px_rgb(20_30_45/0.06)]"
+                  : "border-line bg-paper hover:bg-paper/60"
+              }`}
+            >
+              <span className="relative shrink-0">
+                <svg width="15" height="15" viewBox="0 0 16 16" className="text-ink-5">
+                  <path
+                    d="M2 9.5V12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.5M2 9.5l1.6-5.2a1 1 0 0 1 1-.7h6.8a1 1 0 0 1 1 .7L14 9.5M2 9.5h3l.9 1.6h4.2l.9-1.6h3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                {pendingInbox > 0 && (
+                  <svg width="9" height="9" viewBox="0 0 9 9" className="absolute -top-1 -right-1.5">
+                    <circle cx="4.5" cy="4.5" r="3.2" fill="#fff" stroke="#b08833" strokeWidth="1.6" />
+                  </svg>
+                )}
+              </span>
+              <span className="flex-1 text-[12px] text-ink-3">Inbox</span>
+              {pendingInbox > 0 && (
+                <span className="text-[10px] font-medium tabular-nums text-gold-deep">{pendingInbox}</span>
+              )}
+            </Link>
           </div>
 
           {/* Grouped nav */}
@@ -281,7 +325,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   ×
                 </button>
               </div>
-              <PublicFeed ringUrl={ringUrl} />
+              <PublicFeed ringUrl={ringUrl} highlightTx={publicTx} />
             </aside>
           )}
         </main>

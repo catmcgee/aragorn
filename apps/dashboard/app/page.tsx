@@ -13,9 +13,7 @@ import {
   clearAuth,
   enterCustomRing,
   enterRing,
-  probeDevToken,
   probePrivy,
-  storeDevToken,
 } from "@/lib/ring";
 import { cleanError } from "@aragorn/sdk";
 import { privyConfigured } from "./providers";
@@ -31,9 +29,7 @@ export default function LoginPage() {
   const [phase, setPhase] = useState<Phase>("signin");
   const [rings, setRings] = useState<AccessibleRing[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   // The signed-in identity's email, captured at login so onboarding can invite the founder.
-  // Undefined on the dev-token path (no email) — provisioning falls back to a slug address.
   const [founderEmail, setFounderEmail] = useState<string | undefined>(undefined);
 
   // After authenticating, resolve accessible rings → the picker (which handles the
@@ -49,21 +45,6 @@ export default function LoginPage() {
     if (email) setFounderEmail(email);
     const found = await probePrivy(privyToken);
     resolveRings(found);
-  }
-
-  async function onDevToken(token: string) {
-    setError(null);
-    setBusy(true);
-    try {
-      const found = await probeDevToken(token);
-      if (!found.length) throw new Error("token not valid on any Ring");
-      storeDevToken(token);
-      resolveRings(found);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
   }
 
   function enter(ring: RingKey) {
@@ -100,11 +81,9 @@ export default function LoginPage() {
       {phase === "signin" && (
         <SignIn
           configured={privyConfigured()}
-          busy={busy}
           error={error}
           setError={setError}
           onPrivyToken={onPrivyToken}
-          onDevToken={onDevToken}
         />
       )}
 
@@ -128,60 +107,27 @@ export default function LoginPage() {
 /* ── Step 1: sign in ──────────────────────────────────────────────────────── */
 function SignIn({
   configured,
-  busy,
   error,
   setError,
   onPrivyToken,
-  onDevToken,
 }: {
   configured: boolean;
-  busy: boolean;
   error: string | null;
   setError: (m: string | null) => void;
   onPrivyToken: (t: string, email?: string) => Promise<void>;
-  onDevToken: (t: string) => Promise<void>;
 }) {
-  const [devToken, setDevToken] = useState("");
   return (
     <div className="space-y-5">
       {configured ? (
         <PrivyButton onError={setError} onToken={onPrivyToken} />
       ) : (
         <p className="text-xs text-ink-5">
-          Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID). Use a dev token below.
+          Privy is not configured (set NEXT_PUBLIC_PRIVY_APP_ID).
         </p>
       )}
       <p className="text-center text-[12px] text-ink-5">
-        Sign in with your work email. No wallet, no keys.
+        Sign in with your work email
       </p>
-
-      <details className="border-t border-line-soft pt-4">
-        <summary className="cursor-pointer text-[10px] tracking-[0.18em] text-ink-6 uppercase transition-colors hover:text-ink-4">
-          Developer
-        </summary>
-        <div className="mt-3">
-          <label className="label" htmlFor="dev-token">
-            Service / dev token
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="dev-token"
-              className="input flex-1"
-              placeholder="e.g. ubs-api-token"
-              value={devToken}
-              onChange={(e) => setDevToken(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && devToken.trim() && onDevToken(devToken.trim())}
-            />
-            <button
-              className="btn"
-              disabled={busy || !devToken.trim()}
-              onClick={() => onDevToken(devToken.trim())}
-            >
-              {busy ? "…" : "Use"}
-            </button>
-          </div>
-        </div>
-      </details>
 
       {error && <p className="err">{error}</p>}
     </div>
@@ -226,7 +172,7 @@ function PrivyButton({
         authenticated ? void exchange() : login();
       }}
     >
-      {busy ? "Signing in…" : "Sign in with Privy"}
+      {busy ? "Signing in…" : "Login"}
     </button>
   );
 }

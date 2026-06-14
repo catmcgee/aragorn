@@ -1,8 +1,94 @@
 # Aragorn — Canton, rebuilt on public Ethereum
 
-Aragorn reimplements **Canton Network's institutional ledger model** — UTXO-style notes, sub-transaction privacy, and authority-from-contract workflows like repo — directly on **public Ethereum**, using **Noir ZK circuits** for settlement. Each institution runs a sovereign private node called a **Ring**: it holds the keys, decrypts only its own notes, generates proofs, and enforces internal policy, while the chain sees nothing but gray rings — commitments, nullifiers, and a verified proof. The demo cast: **JP Morgan** (dealer) and **Goldman Sachs** (lender) settling a bilateral repo against a US Treasury note. *Keep it secret, keep it safe.*
+Aragorn is a **Canton-style private institutional settlement system** on Ethereum: UTXO-style notes, sub-transaction privacy, authority-from-contract workflows, and per-institution participant nodes. Each institution runs a sovereign private node called a **Ring**: it holds the keys, decrypts only its own notes, generates Noir proofs, and enforces internal policy, while the chain sees commitments, nullifiers, public inputs, ciphertexts, and a verified proof.
+
+The demo covers private cash, repo DvP, payroll claims, ENS v2 identity, and private strategy positions backed by Privy Earn / Morpho on Base. Settlement can run on Sepolia for the public demo path or local Anvil for gates and scripted resets. *Keep it secret, keep it safe.*
 
 Built at ETHGlobal New York 2026.
+
+---
+
+## System At A Glance
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph User["Institution user"]
+        DB[Dashboard<br/>Next.js client]
+    end
+
+    subgraph Ring["Ring node — one per institution"]
+        API[/v1 REST + SSE<br/>Biscuit auth · policy · four-eyes/]
+        NM[Note manager<br/>coin selection · locks · encumbrance]
+        PR[Prover<br/>Noir witness → bb/UltraHonk]
+        SY[Sync engine<br/>watch Settled · view-tag · decrypt]
+        PG[(Postgres<br/>disposable projection)]
+        API --> NM --> PR
+        SY --> PG
+        NM --> PG
+    end
+
+    subgraph Settlement["Ethereum settlement<br/>Sepolia or local Anvil"]
+        NR[NoteRegistry<br/>Merkle tree · nullifiers · 10 frozen verifiers]
+        SV[ShieldVault<br/>USDC escrow / unshield]
+        NR --- SV
+    end
+
+    subgraph Identity["Sepolia identity"]
+        ENS[ENS v2<br/>PermissionedResolver · subregistries · CCIP-Read]
+    end
+
+    subgraph Treasury["Base public treasury"]
+        EARN[Privy Earn → Morpho]
+    end
+
+    DB -->|Privy JWT → Biscuit| API
+    PR -->|settle calldata| RELAY[Coordinator / relayer<br/>pays gas]
+    RELAY -->|NoteRegistry.settle only| NR
+    SY -.->|events| NR
+    API -.->|resolve / whitelist names| ENS
+    Ring -.->|own records source of truth| ENS
+    API -.->|deposit / withdraw / APY| EARN
+```
+
+### Repo Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Dealer as Dealer Ring
+    participant ETH as Ethereum (NoteRegistry)
+    participant Lender as Lender Ring
+
+    Note over Dealer: Trader books repo against a Treasury note<br/>(over limit → four-eyes approval)
+    Dealer->>ETH: settle(repo_propose_allocate)<br/>RepoProposal + CollateralAllocation
+    Note over ETH,Lender: proposal note names lender as stakeholder
+    ETH-->>Lender: sync engine surfaces proposal from chain
+    Lender->>ETH: settle(repo_accept) — atomic DvP<br/>cash → dealer, encumbered bond → lender, agreement born
+    Note over Dealer,Lender: no moment where one side holds both legs
+    Note over ETH: maturity time gate
+    Dealer->>ETH: settle(repo_close)<br/>principal + interest checked in-circuit
+    ETH-->>Lender: cash principal + interest
+    ETH-->>Dealer: collateral released unencumbered
+```
+
+### Private Strategy Flow
+
+```mermaid
+sequenceDiagram
+    participant Trader as Trader / Dashboard
+    participant Ring as Ring
+    participant Earn as Privy Earn (Base)
+    participant ETH as NoteRegistry
+
+    Trader->>Ring: deposit shielded cash to strategy
+    Ring->>ETH: settle(strategy_open)<br/>Cash nullifier → StrategyPosition note + change
+    Ring->>Earn: deposit public treasury USDC
+    Note over Ring: saga records private-note and Earn legs for retry/compensation
+    Trader->>Ring: withdraw position
+    Ring->>Earn: withdraw from Earn
+    Ring->>ETH: settle(strategy_redeem)<br/>StrategyPosition nullifier → Cash note
+```
 
 ---
 
@@ -10,7 +96,7 @@ Built at ETHGlobal New York 2026.
 
 Canton is, stripped of branding, five primitives — a UTXO-shaped contract set, sub-transaction privacy by projection, templates with party-based authorization, a synchronizer that orders and commits, and a self-sovereign participant node. Aragorn maps each onto Ethereum: the note tree and nullifier set *are* the contract set; encrypting payloads to stakeholders *is* projection; **templates compile to Noir circuits**; **Ethereum L1 is the synchronizer** (ordering, atomicity, neutrality, no consortium to govern); and the **Ring** is the participant node.
 
-**On Ethereum (local Anvil settlement plane):**
+**On Ethereum (Sepolia or local Anvil settlement plane):**
 
 - **NoteRegistry** — the singleton settlement contract. An incremental Poseidon2 Merkle tree of note commitments (depth 32), a recent-roots ring buffer (64), a nullifier set, and a per-circuit verifier registry. Its entrypoint is `settle(circuitId, proof, publicInputs, ciphertexts[])`: verify the proof against a root in the window, check nullifier freshness, insert new commitments, emit `Settled`. A multi-leg DvP either fully lands or fully reverts.
 - **ShieldVault** — USDC custody at the asset boundary. Depositors pre-fund a commitment with `depositFor`; `cash_shield` consumes that escrow and `cash_unshield` releases USDC. Callable only by NoteRegistry on a valid proof.
@@ -27,21 +113,22 @@ Canton is, stripped of branding, five primitives — a UTXO-shaped contract set,
 
 **The dashboard** is a Next.js reference client: capability-driven rendering from the session Biscuit, a portfolio/blotter/inbox/admin, and a split-screen "what the world sees" public-view panel reading raw `Settled` events.
 
-### The eight circuits
+### The ten circuits
 
-Settlement is carried by 8 Noir circuits sharing an `aragorn_lib` gadget crate:
+Settlement is carried by 10 Noir circuits sharing an `aragorn_lib` gadget crate:
 
-`cash_shield` · `cash_transfer` · `cash_unshield` · `cash_fanout` · `entitlement_claim` · `repo_propose_allocate` · `repo_accept` · `repo_close`
+`cash_shield` · `cash_transfer` · `cash_unshield` · `cash_fanout` · `entitlement_claim` · `repo_propose_allocate` · `repo_accept` · `repo_close` · `strategy_open` · `strategy_redeem`
 
 Onchain verification uses **`bb`/UltraHonk Solidity verifiers** (`bb write_solidity_verifier`, one per circuit). Groth16 via World's ProveKit was the originally specified primary prover. ProveKit *does* now ship a gnark-based **recursive Groth16 wrapper** (it re-verifies a WHIR proof inside a gnark BN254 circuit and runs `groth16.Setup/Prove/Verify`) — but it stops off-chain: it never calls gnark's `vk.ExportSolidity()` and discards the proof rather than serializing EVM calldata, so there is **no onchain Groth16 artifact today**. The spec's pre-declared fallback to native UltraHonk therefore stands. A cheaper Groth16 onchain path is production roadmap (it needs the Solidity-export glue forked into ProveKit's Go + a per-circuit trusted setup); gas (~1.5–2M/verify) is irrelevant on local Anvil.
 
 The protocol in five lines:
 
 ```
-payload_hash      = Poseidon2(template fields)            # Cash, BondPosition, RepoProposal, …
+payload_hash      = Poseidon2(template fields)              # Cash, RepoAgreement, StrategyPosition, …
 stakeholders_hash = Poseidon2(sorted party pubkeys)
-commitment        = Poseidon2([template_id, version, payload_hash, stakeholders_hash, salt])
-nullifier         = Poseidon2([commitment, note_secret])  # note_secret shared with ALL stakeholders
+nf_key_hash       = Poseidon2([note_secret])
+commitment        = Poseidon2([template_id, version, payload_hash, stakeholders_hash, nf_key_hash, salt])
+nullifier         = Poseidon2([commitment, note_secret])    # note_secret travels only in encrypted note payloads
 settle(circuitId, proof, [root, T, n1..n4, c1..c4, aux1..aux4], ciphertexts[])
 ```
 
@@ -51,17 +138,26 @@ settle(circuitId, proof, [root, T, n1..n4, c1..c4, aux1..aux4], ciphertexts[])
 
 ## Contract addresses
 
-Three planes: **settlement** on local Anvil (chain id 31337, MockUSDC), **identity** on real ENS v2 (Sepolia), **public treasury** on real Base (Privy Earn → Morpho).
+Three planes: **settlement** on Sepolia for the public demo path or local Anvil for gates, **identity** on real ENS v2 (Sepolia), and **public treasury** on real Base (Privy Earn → Morpho).
+
+### Settlement — Sepolia (chain id 11155111)
+
+| Contract | Address |
+|---|---|
+| NoteRegistry | `0x629bba56dec5189aad7447612be618588d2c7811` |
+| ShieldVault | `0x3cbf4cafca00a0efc60235eec4c2bc3d482d4aad` |
+| MockUSDC | `0xd9e33cd154954045e40bd1de67f824c7ea06316c` |
+| Poseidon2 (Yul) | `0x7d49f0ec0991f160b50b2f35565a9b70bea2d5f3` |
 
 ### Settlement — local Anvil (chain id 31337)
 
 | Contract | Address |
 |---|---|
-| NoteRegistry | `0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9` |
-| ShieldVault | `0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0` |
-| MockUSDC | `0xe7f1725e7734ce288f8367e1bb143e90bb3f0512` |
-| Poseidon2 (Yul) | `0x5fbdb2315678afecb367f032d93f642f64180aa3` |
-| Verifiers (8, one per circuit) | (deploy-time; see `contracts/deployments.local.json`) |
+| NoteRegistry | `0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82` |
+| ShieldVault | `0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0` |
+| MockUSDC | `0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e` |
+| Poseidon2 (Yul) | `0x610178dA211FEF7D417bC0e6FeD39F05609AD788` |
+| Verifiers (10, one per circuit) | (deploy-time; see `contracts/deployments.local.json`) |
 
 The 10 per-circuit UltraHonk verifiers are vendored under `contracts/src/verifiers/`, deployed by `scripts/deploy.ts`, registered in NoteRegistry's `circuitId → verifier` map, and frozen at deploy; their addresses are assigned at deploy time (see `contracts/deployments.local.json`).
 
@@ -109,13 +205,13 @@ Going further than records, an institution **owns its name's subtree onchain**: 
 
 The payroll claim is the one consumer-shaped flow in the system, and it is proved **client-side, in the employee's browser** — the witness (salary, note secrets, `claim_secret`) never leaves their device (`apps/dashboard` runs the prover in a web worker). The `entitlement_claim` circuit is deliberately **pure-Poseidon** (secret-knowledge auth, no embedded-curve operations) precisely so it is backend-portable across proving systems.
 
-For World Track D specifically, that same circuit is proved through **ProveKit's Noir → R1CS → WHIR pipeline** as a standalone spike (`spikes/provekit-booth/`): proven under `provekit-cli` with off-chain verification (an accepted Track D target environment) and **bit-for-bit hash-compatible with `bb.js`**. Honest scope: ProveKit's in-browser SDK (Verity) is blocked by an upstream build-version mismatch, so the ProveKit proof is CLI-level, while the in-dashboard browser claim uses `bb.js`/UltraHonk WASM. Onchain settlement also uses `bb`/UltraHonk — ProveKit's WHIR proofs have no EVM verifier, and its recursive Groth16 wrapper, while real, still exports no Solidity verifier (see *The eight circuits* above). So ProveKit is a legitimate Track-D proving target for the claim circuit, not a load-bearing part of the settlement path.
+For World Track D specifically, that same circuit is proved through **ProveKit's Noir → R1CS → WHIR pipeline** as a standalone spike (`spikes/provekit-booth/`): proven under `provekit-cli` with off-chain verification (an accepted Track D target environment) and **bit-for-bit hash-compatible with `bb.js`**. Honest scope: ProveKit's in-browser SDK (Verity) is blocked by an upstream build-version mismatch, so the ProveKit proof is CLI-level, while the in-dashboard browser claim uses `bb.js`/UltraHonk WASM. Onchain settlement also uses `bb`/UltraHonk — ProveKit's WHIR proofs have no EVM verifier, and its recursive Groth16 wrapper, while real, still exports no Solidity verifier (see *The ten circuits* above). So ProveKit is a legitimate Track-D proving target for the claim circuit, not a load-bearing part of the settlement path.
 
 ### Privy — auth, the funding wallet, and yield
 
 Privy is the entire human layer, and the reason there are no wallets anywhere by design. Institutional users sign in with their **work email**; the Ring verifies the Privy JWT server-side and exchanges it for a scoped, short-lived **Biscuit** session token carrying the user's entitlements — so people get *authorization*, never keys, and nothing phishable walks out the door with an employee (Canton's own no-end-user-wallets model, with consumer-grade onboarding in front). Invites are restricted by email domain allowlist.
 
-On the public plane, the Ring's funding wallet — the shield/unshield ramp between public USDC and private notes — is a **Privy server wallet**. And idle treasury USDC earns real yield through **Privy Earn**, which allocates to **Morpho ERC-4626 vaults on Base** (Gauntlet/Steakhouse), with live balance/APY and working deposit/withdraw in the dashboard (D-004). That is the "tradfi + crypto-native yield" story in one SDK; the private-strategies card (the position itself a shielded note) sits greyed beside it as roadmap.
+On the public plane, the Ring's funding wallet — the shield/unshield ramp between public USDC and private notes — is a **Privy server wallet**. Idle treasury USDC earns real yield through **Privy Earn**, which allocates to **Morpho ERC-4626 vaults on Base** (Gauntlet/Steakhouse), with live balance/APY and working deposit/withdraw in the dashboard (D-004). Aragorn wraps that public Earn leg in a private `StrategyPosition` note: `strategy_open` burns shielded Cash and mints a ZK-redeemable position; `strategy_redeem` burns that position and returns principal as shielded Cash.
 
 ---
 
@@ -134,77 +230,7 @@ make p5     # Privy Earn (real Base) + in-browser claim proving
 make demo   # demo-reset → the full ~10-minute script against a running stack
 ```
 
-The settlement chain is plain local Anvil (`--block-time 1`); deploys run via `scripts/deploy.ts` (viem) rather than `forge script` (D-013). `make demo-reset` redeploys + reseeds (Rings rebuild from events, so state snapshots are not used). ENS reads hit a real Sepolia RPC; Privy Earn runs against real Base — both are real-network services and cannot run on the local chain.
-
----
-
-## Diagrams
-
-### System architecture
-
-```mermaid
-flowchart TB
-    subgraph User["Institution (e.g. JP Morgan)"]
-        DB[Dashboard<br/>Next.js reference client]
-    end
-
-    subgraph Ring["Ring node — one per institution (the product)"]
-        API[/v1 REST + SSE API<br/>Biscuit auth · policy engine · four-eyes/]
-        NM[Note manager<br/>coin selection · encumbrance]
-        PR[Prover<br/>Noir witness → bb/UltraHonk]
-        SY[Sync engine<br/>tail Settled · view-tag · decrypt]
-        PG[(Postgres<br/>disposable cache)]
-        API --> NM --> PR
-        SY --> PG
-        NM --> PG
-    end
-
-    subgraph ETH["Ethereum — local Anvil (settlement)"]
-        NR[NoteRegistry<br/>Merkle tree · nullifiers · 8 verifiers]
-        SV[ShieldVault<br/>USDC custody]
-        NR --- SV
-    end
-
-    subgraph Sepolia["Sepolia (identity)"]
-        ENS[ENS v2<br/>PermissionedResolver · CCIP-Read]
-    end
-
-    subgraph Base["Base (public treasury)"]
-        EARN[Privy Earn → Morpho]
-    end
-
-    DB -->|Privy JWT → Biscuit| API
-    PR -->|signed settle| RELAY[Coordinator / relayer<br/>pays gas]
-    RELAY -->|settle proof| NR
-    SY -.->|watch events| NR
-    API -.->|resolve / whitelist names| ENS
-    Ring -.->|own records source of truth| ENS
-    API -.->|deposit / withdraw / APY| EARN
-```
-
-### Repo lifecycle (atomic DvP, in-circuit interest)
-
-```mermaid
-sequenceDiagram
-    participant JPM as JP Morgan Ring (dealer)
-    participant ETH as Ethereum (NoteRegistry)
-    participant GS as Goldman Ring (lender)
-
-    Note over JPM: Trader books $5M overnight vs the Treasury note<br/>(over limit → four-eyes approval folds into the booking)
-    JPM->>ETH: settle(repo_propose_allocate)<br/>RepoProposal + CollateralAllocation (bond locked)
-    Note over ETH,GS: proposal note names Goldman as stakeholder
-    ETH-->>GS: sync engine surfaces proposal in inbox (onchain, no relay)
-    Note over GS: credit/limits checks run node-side
-    GS->>ETH: settle(repo_accept) — ATOMIC DvP<br/>cash → JPM, encumbered bond → GS, RepoAgreement born
-    Note over JPM,GS: no moment where one side holds both legs
-    Note over ETH: ---- time-warp: evm_increaseTime to maturity ----
-    Note over JPM: maturity cron fires auto-close
-    JPM->>ETH: settle(repo_close)<br/>principal + interest computed IN-CIRCUIT (a wrong number cannot verify)
-    Note over ETH: time-gated: block.timestamp ≥ T, circuit asserts maturity ≤ T
-    ETH-->>GS: cash (P + interest) → Goldman
-    ETH-->>JPM: collateral released, unencumbered → JP Morgan
-    Note over JPM,GS: lender did nothing — consent given at accept, enforced by math since
-```
+Local gates use Anvil (`--block-time 1`); deploys run via `scripts/deploy.ts` (viem) rather than `forge script` (D-013). `make demo-reset` redeploys + reseeds (Rings rebuild from events, so state snapshots are not used). ENS reads hit a real Sepolia RPC; Privy Earn runs against real Base — both are real-network services and cannot run on the local chain.
 
 ---
 

@@ -43,7 +43,6 @@ const STATUS_TEXT: Record<string, string> = {
 
 export default function MyPayPage() {
   const { ringUrl } = useRing();
-  const [employeeId, setEmployeeId] = useState("1");
   const [claimData, setClaimData] = useState<ClaimData | null>(null);
   const [phase, setPhase] = useState<Phase>({ step: "idle" });
   const [error, setError] = useState<string | null>(null);
@@ -71,21 +70,34 @@ export default function MyPayPage() {
     [ringUrl],
   );
 
-  async function fetchClaimable() {
+  // Resolve the logged-in user's own claimable salary (self-scoped by session — no id).
+  const fetchClaimable = useCallback(async () => {
     setError(null);
     setClaimData(null);
     setPhase({ step: "fetching" });
     try {
-      const data = await authedPost("/v1/payroll/claim-data", {
-        employeeId: Number(employeeId),
+      const token = getStoredToken();
+      const res = await fetch(`${ringUrl}/v1/payroll/my-claim`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
       });
-      setClaimData(data as unknown as ClaimData);
-      setPhase({ step: "ready" });
+      const json = (await res.json().catch(() => ({}))) as { claim?: unknown; error?: string };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (json.claim) {
+        setClaimData(json.claim as ClaimData);
+        setPhase({ step: "ready" });
+      } else {
+        setPhase({ step: "idle" });
+      }
     } catch (e) {
       setError(cleanError(e));
       setPhase({ step: "idle" });
     }
-  }
+  }, [ringUrl]);
+
+  // Auto-load on open — your pay is resolved from your session, not a form.
+  useEffect(() => {
+    void fetchClaimable();
+  }, [fetchClaimable]);
 
   function claimPrivately() {
     if (!claimData) return;
@@ -155,28 +167,17 @@ export default function MyPayPage() {
       {error && <p className="err">{error}</p>}
 
       <section className="card space-y-4">
-        <div>
-          <label className="label" htmlFor="employee-id">
-            Employee ID
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="employee-id"
-              type="number"
-              min={1}
-              className="input w-32"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              disabled={busy}
-            />
-            <button className="btn" onClick={fetchClaimable} disabled={busy}>
-              Fetch claimable salary
+        {phase.step === "idle" && !claimData && !error && (
+          <div className="rounded-md border border-line bg-ground p-4">
+            <p className="text-sm text-ink-4">No claimable salary right now.</p>
+            <p className="mt-1 text-xs text-ink-5">
+              When your employer runs payroll, your entitlement appears here to claim privately.
+            </p>
+            <button className="btn mt-3" onClick={fetchClaimable} disabled={busy}>
+              Refresh
             </button>
           </div>
-          <p className="mt-1 text-xs text-ink-5">
-            Demo input — in production this comes from your session.
-          </p>
-        </div>
+        )}
 
         {claimData && (
           <div className="rounded-md border border-line bg-ground p-4">

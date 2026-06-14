@@ -164,6 +164,19 @@ export class Payroll {
     };
   }
 
+  /** Resolve the logged-in user's own claimable salary — no employee id needed (it comes
+   *  from the session). Returns null when there's nothing to claim. */
+  async myClaimData(userEmail: string): Promise<Record<string, unknown> | null> {
+    const [item] = await this.sql`
+      SELECT p.employee_id FROM payroll_items p
+      JOIN employees e ON e.id = p.employee_id
+      JOIN users u ON u.id = e.user_id
+      WHERE u.email = ${userEmail} AND p.status = 'claimable'
+      ORDER BY p.id DESC LIMIT 1`;
+    if (!item) return null;
+    return this.claimData(userEmail, item.employee_id);
+  }
+
   /** Server-proved claim (P4 path; browser proving arrives in P5). */
   async claim(userEmail: string, employeeId: number): Promise<{ txid: string; cid: string }> {
     const data = await this.claimData(userEmail, employeeId);

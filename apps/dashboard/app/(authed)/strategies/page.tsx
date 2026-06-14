@@ -1,7 +1,9 @@
 "use client";
 
-// Strategies — treasury yield. Earn deposits route idle USDC into the Gauntlet
-// USDC Prime vault (Morpho, Base) via Privy; private strategies are roadmap.
+// Strategies — private treasury yield. A deposit consumes shielded cash, mints a private
+// StrategyPosition note (the ZK-redeemable principal claim), and deploys into the Gauntlet
+// USDC Prime vault (Morpho, Base) via Privy Earn. Redeem burns the note. The fully-private
+// (position-as-note, direct DeFi) extension is the roadmap box.
 // The strategies endpoints are not in @aragorn/sdk yet, so raw authed fetch.
 
 import { useEffect, useState } from "react";
@@ -152,9 +154,17 @@ export default function StrategiesPage() {
       ) : (
         <div className="flex flex-wrap items-start gap-6">
           <section className="card w-full max-w-md space-y-4">
-            <h2 className="section-title">
-              Privy Earn — Gauntlet USDC Prime (Morpho, Base)
-            </h2>
+            <div>
+              <span className="rounded-md border border-gold/40 bg-gold/5 px-1.5 py-0.5 text-[9.5px] font-medium tracking-[0.08em] text-gold-deep uppercase">
+                Private · live
+              </span>
+              <h2 className="section-title mt-1.5">
+                Private yield — Privy Earn (Gauntlet USDC Prime · Morpho, Base)
+              </h2>
+              <p className="mt-1 text-[11px] text-ink-5">
+                Cash is deployed through a private note, so the position isn&apos;t linkable to your institution on-chain.
+              </p>
+            </div>
 
             {!earn?.enabled ? (
               <p className="text-sm text-ink-5">
@@ -175,7 +185,7 @@ export default function StrategiesPage() {
                       {fmtMicro(data.deployedMicro)}
                     </p>
                     <p className="mt-0.5 text-[10px] text-ink-6">
-                      Held as a private note — the public chain sees a shielded transfer, not your Earn deposit.
+                      The public chain sees the deposit amount, but not who it came from.
                     </p>
                   </div>
                 </div>

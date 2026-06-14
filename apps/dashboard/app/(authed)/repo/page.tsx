@@ -254,10 +254,6 @@ export default function RepoPage() {
               No <Term t="encumbered">unencumbered</Term> bond positions.
             </p>
           )}
-          <p className="mt-1 text-[11px] text-ink-5">
-            No <Term t="haircut" /> in this demo — collateral pledged at face on
-            the <Term t="on-leg" />.
-          </p>
         </div>
 
         <div>
@@ -274,7 +270,7 @@ export default function RepoPage() {
 
         <div>
           <label className="label" htmlFor="counterparty">
-            Counterparty ENS
+            Counterparty
           </label>
           <input
             id="counterparty"

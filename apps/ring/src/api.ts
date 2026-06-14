@@ -54,6 +54,20 @@ export function buildApi(
     }),
   );
 
+  // Historical public view: featureless settlement summaries (settlement tx + how many
+  // commitments it inserted — no parties, no amounts, no terms) so the "what the world
+  // sees" panel reflects real onchain activity, not just live events. Unauthenticated.
+  app.get("/public-events", async (c) => {
+    const rows = await sql`
+      SELECT created_tx AS tx, MAX(block_num)::text AS block_num, COUNT(*)::int AS commitments
+      FROM notes
+      WHERE created_tx IS NOT NULL
+      GROUP BY created_tx
+      ORDER BY MAX(block_num) DESC NULLS LAST
+      LIMIT 50`;
+    return c.json({ events: rows });
+  });
+
   // Privy JWT → session Biscuit
   app.post("/auth/exchange", async (c) => {
     try {
@@ -669,6 +683,17 @@ export function buildApi(
     }
   });
 
+  // Self-scoped: the logged-in user's own claimable salary (resolved by their email — no
+  // employee id to guess). Any role can claim their own pay. Returns { claim: null } if none.
+  v1.get("/payroll/my-claim", async (c) => {
+    try {
+      const user = c.get("user");
+      return c.json({ claim: await payroll.myClaimData(user.email) });
+    } catch (e) {
+      return onError(c, e);
+    }
+  });
+
   v1.post("/payroll/claim", async (c) => {
     try {
       const user = requireRole(c, "employee");
@@ -683,7 +708,7 @@ export function buildApi(
 
   v1.post("/payroll/submit-claim", async (c) => {
     try {
-      const user = requireRole(c, "employee");
+      const user = requireRole(c, "employee", "admin");
       const { proof, publicInputs } = await c.req.json();
       const result = await payroll.submitClaim(user.email, proof, publicInputs);
       await audit(sql, user.email, "payroll_submit_claim", result);

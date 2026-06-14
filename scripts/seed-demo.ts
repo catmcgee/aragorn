@@ -27,8 +27,9 @@ step("whitelists: live ENSv2 resolution both directions");
 await UBS.addWhitelist("goldman.aragornrings.eth");
 await DRW.addWhitelist("jpmorgan.aragornrings.eth");
 
-// 3. employees + subnames
-step("employees: cat, alice, bob (CCIP subnames under jpmorgan.aragornrings.eth)");
+// 3. employees + subnames. `founder` is linked to the demo login (helloworld@mcgee.cat)
+// so the signed-in user has a claimable salary on the My Pay page.
+step("employees: founder, cat, alice, bob (CCIP subnames under jpmorgan.aragornrings.eth)");
 // sdk has no employees method; raw calls:
 async function raw(client: "ubs" | "drw", method: string, path: string, body?: unknown) {
   const base = client === "ubs" ? "http://127.0.0.1:4001" : "http://127.0.0.1:4002";
@@ -42,7 +43,12 @@ async function raw(client: "ubs" | "drw", method: string, path: string, body?: u
   if (!res.ok && res.status !== 202) throw new Error(`${path}: ${JSON.stringify(json).slice(0, 150)}`);
   return json as any;
 }
-for (const [label, email] of [["cat", "cat@jpmorgan-demo.com"], ["alice", undefined], ["bob", undefined]] as const) {
+for (const [label, email] of [
+  ["founder", "helloworld@mcgee.cat"],
+  ["cat", "cat@jpmorgan-demo.com"],
+  ["alice", undefined],
+  ["bob", undefined],
+] as const) {
   await raw("ubs", "POST", "/v1/employees", { subnameLabel: label, email });
 }
 
@@ -52,20 +58,22 @@ await UBS.shield("treasury", $(10_000_000));
 step("shield $10M → DRW::desk (proving…)");
 await DRW.shield("desk", $(10_000_000));
 
-// 5. payroll history (§10.5): one run, one claim [2 proofs]
-step("payroll run: 3 employees (proving…)");
+// 5. payroll history (§10.5): one run, one claim. employees[0] = founder (the demo login) —
+// pay them but DON'T claim it, so the signed-in user has a live claimable salary in My Pay.
+step("payroll run: 4 employees (proving…)");
 const employees = (await raw("ubs", "GET", "/v1/employees")).employees as { id: number }[];
 await raw("ubs", "POST", "/v1/payroll/run", {
   payerParty: "treasury",
   payments: [
-    { employeeId: employees[0].id, amountMicro: $(12_500).toString() },
-    { employeeId: employees[1].id, amountMicro: $(9_800).toString() },
-    { employeeId: employees[2].id, amountMicro: $(11_200).toString() },
+    { employeeId: employees[0].id, amountMicro: $(15_000).toString() }, // founder — left claimable
+    { employeeId: employees[1].id, amountMicro: $(12_500).toString() },
+    { employeeId: employees[2].id, amountMicro: $(9_800).toString() },
+    { employeeId: employees[3].id, amountMicro: $(11_200).toString() },
   ],
 });
 await new Promise((r) => setTimeout(r, 2500));
-step("salary claim: employee #1 (proving…)");
-await raw("ubs", "POST", "/v1/payroll/claim", { employeeId: employees[0].id });
+step("salary claim: cat (employees[1]) — founder's stays claimable for the demo");
+await raw("ubs", "POST", "/v1/payroll/claim", { employeeId: employees[1].id });
 
 // 6. internal transfer history with approval trail (§10.6) [1 proof]
 step("four-eyes history: jane books $2M treasury→trading, marcus approves (proving…)");

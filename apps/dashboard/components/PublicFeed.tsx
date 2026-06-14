@@ -15,14 +15,32 @@ interface FeedRow {
   tx?: string;
   txid?: string;
   status?: string;
+  commitments?: number;
   [k: string]: unknown;
 }
 
-export default function PublicFeed({ ringUrl }: { ringUrl: string }) {
+export default function PublicFeed({
+  ringUrl,
+  highlightTx,
+}: {
+  ringUrl: string;
+  highlightTx?: string | null;
+}) {
   const [rows, setRows] = useState<FeedRow[]>([]);
   const [state, setState] = useState<"connecting" | "open" | "error">("connecting");
 
   useEffect(() => {
+    let live = true;
+    // History: the settlements already onchain (featureless summaries), so the panel
+    // reflects real activity instead of sitting empty until the next live event.
+    fetch(`${ringUrl}/public-events`)
+      .then((r) => r.json())
+      .then((d: { events?: FeedRow[] }) => {
+        if (!live) return;
+        setRows((d.events ?? []).map((e) => ({ type: "settlement", ...e })));
+      })
+      .catch(() => {});
+    // Live: new settlements stream in and prepend.
     const es = new EventSource(`${ringUrl}/public-feed`);
     es.onopen = () => setState("open");
     es.onerror = () => setState("error");
@@ -34,7 +52,10 @@ export default function PublicFeed({ ringUrl }: { ringUrl: string }) {
         // ignore malformed frames
       }
     };
-    return () => es.close();
+    return () => {
+      live = false;
+      es.close();
+    };
   }, [ringUrl]);
 
   return (
@@ -52,14 +73,23 @@ export default function PublicFeed({ ringUrl }: { ringUrl: string }) {
         {rows.map((e, i) => {
           const tx =
             typeof e.tx === "string" ? e.tx : typeof e.txid === "string" ? e.txid : null;
+          const circuit = e.circuit ?? e.circuitId;
+          const isHi = !!highlightTx && !!tx && tx.toLowerCase() === highlightTx.toLowerCase();
           return (
             <div
               key={i}
-              className="flex items-center gap-2 rounded-lg border border-line-soft bg-ground/60 px-2.5 py-2"
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
+                isHi ? "border-gold/60 bg-gold/5" : "border-line-soft bg-ground/60"
+              }`}
             >
               <GrayRing size={16} />
               <span className="text-xs text-ink-4">{e.type ?? "settlement"}</span>
-              <span className="chip">circuit #{String(e.circuit ?? e.circuitId ?? "?")}</span>
+              {circuit != null && <span className="chip">circuit #{String(circuit)}</span>}
+              {typeof e.commitments === "number" && (
+                <span className="chip">
+                  {e.commitments} commitment{e.commitments === 1 ? "" : "s"}
+                </span>
+              )}
               <HashChip value={tx} kind="tx" />
               <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-pos">
                 <svg width="11" height="11" viewBox="0 0 16 16">
