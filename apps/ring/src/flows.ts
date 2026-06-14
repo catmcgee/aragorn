@@ -15,6 +15,7 @@ import {
   hexToField,
   newNote,
   nullifier,
+  stringHash,
   prove,
   signField,
   transitionMessage,
@@ -29,6 +30,7 @@ import { releaseNotes, selectCash, type SelectedNote } from "./notes.ts";
 import type { Sql } from "./db.ts";
 
 const CIRCUITS_DIR = process.env.CIRCUITS_DIR ?? "circuits";
+const SHIELD_VAULT_ABI = parseAbi(["function depositFor(bytes32 commitment, uint256 amount)"]);
 const artifacts = new Map<string, any>();
 function artifact(name: string) {
   if (!artifacts.has(name))
@@ -147,6 +149,18 @@ export class Flows {
     });
     await this.chain.pub.waitForTransactionReceipt({ hash: approveTx });
 
+    const depositTx = await this.chain.fundingWallet.sendTransaction({
+      to: this.cfg.vaultAddr,
+      data: encodeFunctionData({
+        abi: SHIELD_VAULT_ABI,
+        functionName: "depositFor",
+        args: [fieldToHex(c), amount],
+      }),
+      chain: this.chain.fundingWallet.chain,
+      account: this.chain.fundingWallet.account!,
+    });
+    await this.chain.pub.waitForTransactionReceipt({ hash: depositTx });
+
     const root = this.chain.tree.root;
     const bundle = await enqueueProof(() =>
       prove("cash_shield", artifact("cash_shield"), {
@@ -154,11 +168,12 @@ export class Flows {
         t_bound: "0",
         nullifiers: ["0", "0", "0", "0"],
         commitments: [fieldToHex(c), "0", "0", "0"],
-        aux: [fieldToHex(amount), fieldToHex(addressToField(this.chain.fundingAddress)), "0", "0"],
+        aux: [fieldToHex(amount), "0", "0", "0"],
         owner_x: fieldToHex(owner.x),
         amount: amount.toString(),
         salt: fieldToHex(note.salt),
         salt2: fieldToHex(note.fields.salt2),
+        note_secret: fieldToHex(note.noteSecret),
       }),
     );
     const txid = await this.settleRaw(CircuitId.cash_shield, bundle, encryptNoteFor([this.orgEncPub], note));
@@ -237,9 +252,11 @@ export class Flows {
         out1_amount: amount.toString(),
         out1_salt: fieldToHex(outNote.salt),
         out1_salt2: fieldToHex(outNote.fields.salt2),
+        out1_secret: fieldToHex(outNote.noteSecret),
         change_amount: change.toString(),
         change_salt: fieldToHex(changeNote.salt),
         change_salt2: fieldToHex(changeNote.fields.salt2),
+        change_secret: fieldToHex(changeNote.noteSecret),
       }),
     );
 
@@ -249,6 +266,154 @@ export class Flows {
     ];
     const txid = await this.settleRaw(CircuitId.cash_transfer, bundle, cts);
     return { txid, cid: fieldToHex(c1) };
+  }
+
+  /** Open a private strategy position: consume Cash for `amount`, mint a StrategyPosition
+   *  note (the private principal claim) + Cash change. The real Privy Earn deposit is the
+   *  caller's responsibility (off-circuit). Returns the position note's cid. */
+  async openStrategy(
+    partyLabel: string,
+    vaultId: string,
+    amount: bigint,
+    openTs: bigint,
+  ): Promise<{ txid: string; cid: string }> {
+    const owner = this.party(partyLabel);
+    const inputs = await selectCash(this.sql, partyLabel, amount);
+    try {
+      const inSum = inputs.reduce((s, n) => s + n.amount, 0n);
+      const change = inSum - amount;
+      const vaultHash = stringHash(vaultId);
+
+      const posNote = newNote(
+        TemplateId.StrategyPosition,
+        { owner_x: owner.x, vault_id_hash: vaultHash, amount, open_ts: openTs },
+        [owner.x],
+      );
+      const changeNote = newNote(TemplateId.Cash, { owner_x: owner.x, amount: change, salt2: 0n }, [owner.x]);
+      const c1 = commitment(posNote);
+      const c2 = commitment(changeNote);
+
+      const in1 = inputs[0];
+      const in2 = inputs.length > 1 ? inputs[1] : undefined;
+      const n1 = nullifier(hexToField(in1.cid), in1.noteSecret);
+      const n2 = in2 ? nullifier(hexToField(in2.cid), in2.noteSecret) : 0n;
+
+      const root = this.chain.tree.root;
+      const sig = signField(owner, transitionMessage(root, [n1, n2], [c1, c2]));
+      const zeroPath = Array(32).fill("0");
+
+      const bundle = await enqueueProof(() =>
+        prove("strategy_open", artifact("strategy_open"), {
+          root: fieldToHex(root),
+          t_bound: "0",
+          nullifiers: [fieldToHex(n1), in2 ? fieldToHex(n2) : "0", "0", "0"],
+          commitments: [fieldToHex(c1), fieldToHex(c2), "0", "0"],
+          aux: ["0", "0", "0", "0"],
+          in1_amount: in1.amount.toString(),
+          in1_salt: fieldToHex(in1.salt),
+          in1_salt2: in1.fields.salt2,
+          in1_secret: fieldToHex(in1.noteSecret),
+          in1_index: in1.leafIndex,
+          in1_path: this.chain.tree.path(in1.leafIndex).map(fieldToHex),
+          in2_real: !!in2,
+          in2_amount: in2 ? in2.amount.toString() : "0",
+          in2_salt: in2 ? fieldToHex(in2.salt) : "0",
+          in2_salt2: in2 ? in2.fields.salt2 : "0",
+          in2_secret: in2 ? fieldToHex(in2.noteSecret) : "0",
+          in2_index: in2 ? in2.leafIndex : 0,
+          in2_path: in2 ? this.chain.tree.path(in2.leafIndex).map(fieldToHex) : zeroPath,
+          owner_x: fieldToHex(owner.x),
+          owner_y: fieldToHex(owner.y),
+          sig: {
+            s_lo: fieldToHex(sig.sLo),
+            s_hi: fieldToHex(sig.sHi),
+            e_lo: fieldToHex(sig.eLo),
+            e_hi: fieldToHex(sig.eHi),
+          },
+          vault_id_hash: fieldToHex(vaultHash),
+          principal: amount.toString(),
+          open_ts: fieldToHex(openTs),
+          pos_salt: fieldToHex(posNote.salt),
+          pos_secret: fieldToHex(posNote.noteSecret),
+          change_amount: change.toString(),
+          change_salt: fieldToHex(changeNote.salt),
+          change_salt2: fieldToHex(changeNote.fields.salt2),
+          change_secret: fieldToHex(changeNote.noteSecret),
+        }),
+      );
+
+      const cts = [
+        ...encryptNoteFor([this.orgEncPub], posNote),
+        ...encryptNoteFor([this.orgEncPub], changeNote),
+      ];
+      const txid = await this.settleRaw(CircuitId.strategy_open, bundle, cts);
+      return { txid, cid: fieldToHex(c1) };
+    } catch (e) {
+      await releaseNotes(this.sql, inputs.map((n) => n.cid));
+      throw e;
+    }
+  }
+
+  /** Redeem a private strategy position: consume the StrategyPosition note, mint a Cash note
+   *  for its principal back to the owner. The real Privy Earn withdraw is the caller's
+   *  responsibility (off-circuit); yield is realized in the public Earn position. */
+  async redeemStrategy(
+    partyLabel: string,
+    positionCid: string,
+  ): Promise<{ txid: string; cid: string }> {
+    const owner = this.party(partyLabel);
+    const [pos] = await this.sql`
+      SELECT cid, payload, salt, note_secret, leaf_index, amount_micro
+      FROM notes WHERE cid = ${positionCid} AND template_id = ${TemplateId.StrategyPosition} AND status = 'active'`;
+    if (!pos) throw new Error(`no active strategy position ${positionCid}`);
+    // reserve the position note (Canton-style lock) so it can't be double-redeemed
+    const locked = await this.sql`
+      UPDATE notes SET status = 'pending_consume' WHERE cid = ${positionCid} AND status = 'active' RETURNING cid`;
+    if (!locked.length) throw new Error("CONTENTION: position already being redeemed, retry");
+    try {
+      const principal = BigInt(pos.amount_micro);
+      const outNote = newNote(TemplateId.Cash, { owner_x: owner.x, amount: principal, salt2: 0n }, [owner.x]);
+      const c1 = commitment(outNote);
+      const n1 = nullifier(hexToField(positionCid), hexToField(pos.note_secret));
+
+      const root = this.chain.tree.root;
+      const sig = signField(owner, transitionMessage(root, [n1], [c1]));
+
+      const bundle = await enqueueProof(() =>
+        prove("strategy_redeem", artifact("strategy_redeem"), {
+          root: fieldToHex(root),
+          t_bound: "0",
+          nullifiers: [fieldToHex(n1), "0", "0", "0"],
+          commitments: [fieldToHex(c1), "0", "0", "0"],
+          aux: ["0", "0", "0", "0"],
+          vault_id_hash: pos.payload.vault_id_hash,
+          principal: principal.toString(),
+          open_ts: pos.payload.open_ts,
+          pos_salt: pos.salt,
+          pos_secret: pos.note_secret,
+          pos_index: pos.leaf_index,
+          pos_path: this.chain.tree.path(pos.leaf_index).map(fieldToHex),
+          owner_x: fieldToHex(owner.x),
+          owner_y: fieldToHex(owner.y),
+          sig: {
+            s_lo: fieldToHex(sig.sLo),
+            s_hi: fieldToHex(sig.sHi),
+            e_lo: fieldToHex(sig.eLo),
+            e_hi: fieldToHex(sig.eHi),
+          },
+          out_salt: fieldToHex(outNote.salt),
+          out_salt2: fieldToHex(outNote.fields.salt2),
+          out_secret: fieldToHex(outNote.noteSecret),
+        }),
+      );
+
+      const cts = [...encryptNoteFor([this.orgEncPub], outNote)];
+      const txid = await this.settleRaw(CircuitId.strategy_redeem, bundle, cts);
+      return { txid, cid: fieldToHex(c1) };
+    } catch (e) {
+      await releaseNotes(this.sql, [positionCid]);
+      throw e;
+    }
   }
 
   /** B3: Cash note → public USDC to a recipient address. Single-input circuit. */
@@ -270,7 +435,9 @@ export class Flows {
       const c1 = commitment(changeNote);
       const n1 = nullifier(hexToField(in1.cid), in1.noteSecret);
       const root = this.chain.tree.root;
-      const sig = signField(owner, transitionMessage(root, [n1], [c1]));
+      const unshieldAmountField = amount;
+      const recipientField = addressToField(recipientAddr);
+      const sig = signField(owner, transitionMessage(root, [n1], [c1], [unshieldAmountField, recipientField]));
 
       const bundle = await enqueueProof(() =>
         prove("cash_unshield", artifact("cash_unshield"), {
@@ -278,7 +445,7 @@ export class Flows {
           t_bound: "0",
           nullifiers: [fieldToHex(n1), "0", "0", "0"],
           commitments: [fieldToHex(c1), "0", "0", "0"],
-          aux: [fieldToHex(amount), fieldToHex(addressToField(recipientAddr)), "0", "0"],
+          aux: [fieldToHex(unshieldAmountField), fieldToHex(recipientField), "0", "0"],
           in1_amount: in1.amount.toString(),
           in1_salt: fieldToHex(in1.salt),
           in1_salt2: in1.fields.salt2,
@@ -297,6 +464,7 @@ export class Flows {
           change_amount: change.toString(),
           change_salt: fieldToHex(changeNote.salt),
           change_salt2: fieldToHex(changeNote.fields.salt2),
+          change_secret: fieldToHex(changeNote.noteSecret),
         }),
       );
       const txid = await this.settleRaw(

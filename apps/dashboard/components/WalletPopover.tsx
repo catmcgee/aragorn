@@ -6,11 +6,17 @@
 // a plain message instead (see AppShell).
 
 import { useEffect, useState } from "react";
-import { useWallets, useFundWallet } from "@privy-io/react-auth";
-import { createPublicClient, http, formatUnits, type Address } from "viem";
-import { base } from "viem/chains";
+import { useWallets } from "@privy-io/react-auth";
+import { createPublicClient, http, formatUnits, type Address, type Chain } from "viem";
+import { base, mainnet } from "viem/chains";
 
-const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+type ChainKey = "ethereum" | "base";
+
+// Per-chain config — the same embedded-wallet address holds balances on every EVM chain.
+const CHAINS: Record<ChainKey, { chain: Chain; usdc: Address; label: string }> = {
+  ethereum: { chain: mainnet, usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", label: "Ethereum" },
+  base: { chain: base, usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", label: "Base" },
+};
 const ERC20_BALANCE_OF = [
   {
     name: "balanceOf",
@@ -21,16 +27,9 @@ const ERC20_BALANCE_OF = [
   },
 ] as const;
 
-const baseClient = createPublicClient({ chain: base, transport: http() });
-
-function shortAddr(a: string): string {
-  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
-}
-
-interface Balances {
+interface ChainBalance {
   eth: string;
   usdc: string;
-  empty: boolean;
 }
 
 export default function WalletPopover({ onClose }: { onClose: () => void }) {
@@ -38,62 +37,42 @@ export default function WalletPopover({ onClose }: { onClose: () => void }) {
   const embedded = wallets.find((w) => w.walletClientType === "privy");
   const address = embedded?.address as Address | undefined;
 
-  const [copied, setCopied] = useState(false);
-  const [balances, setBalances] = useState<Balances | null>(null);
+  const [balances, setBalances] = useState<Record<ChainKey, ChainBalance> | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Privy's useFundWallet may not exist on every version — guard defensively so the
-  // build/runtime never breaks if it's absent.
-  let fundWallet: ((args: { address: string }) => Promise<unknown>) | null = null;
-  try {
-    const fw = useFundWallet();
-    if (fw && typeof fw.fundWallet === "function") fundWallet = fw.fundWallet;
-  } catch {
-    fundWallet = null;
-  }
 
   useEffect(() => {
     if (!address) return;
     let live = true;
     setLoading(true);
     setBalances(null);
-    (async () => {
+    const read = async (key: ChainKey): Promise<ChainBalance> => {
       try {
+        const { chain, usdc } = CHAINS[key];
+        const client = createPublicClient({ chain, transport: http() });
         const [wei, raw] = await Promise.all([
-          baseClient.getBalance({ address }),
-          baseClient.readContract({
-            address: USDC_BASE,
+          client.getBalance({ address }),
+          client.readContract({
+            address: usdc,
             abi: ERC20_BALANCE_OF,
             functionName: "balanceOf",
             args: [address],
           }) as Promise<bigint>,
         ]);
-        if (!live) return;
-        const eth = Number(formatUnits(wei, 18));
-        const usdc = Number(formatUnits(raw, 6));
-        setBalances({
-          eth: eth.toFixed(4),
-          usdc: usdc.toFixed(2),
-          empty: wei === 0n && raw === 0n,
-        });
+        return { eth: Number(formatUnits(wei, 18)).toFixed(4), usdc: Number(formatUnits(raw, 6)).toFixed(2) };
       } catch {
-        if (live) setBalances({ eth: "—", usdc: "—", empty: false });
-      } finally {
-        if (live) setLoading(false);
+        return { eth: "—", usdc: "—" };
       }
+    };
+    (async () => {
+      const [ethereum, baseBal] = await Promise.all([read("ethereum"), read("base")]);
+      if (!live) return;
+      setBalances({ ethereum, base: baseBal });
+      setLoading(false);
     })();
     return () => {
       live = false;
     };
   }, [address]);
-
-  function copy() {
-    if (!address) return;
-    navigator.clipboard?.writeText(address).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
-    });
-  }
 
   return (
     <div className="space-y-3">
@@ -107,46 +86,43 @@ export default function WalletPopover({ onClose }: { onClose: () => void }) {
             <div className="mb-1 text-[10px] tracking-[0.14em] text-ink-6 uppercase">
               Embedded wallet
             </div>
-            <button className="chip" onClick={copy} title="Click to copy address">
-              {shortAddr(address)}
-              <span className="text-ink-6">{copied ? "copied" : "copy"}</span>
-            </button>
+            <a
+              href={`https://basescan.org/address/${address}`}
+              target="_blank"
+              rel="noreferrer"
+              className="chip font-mono"
+              title="View on Basescan"
+            >
+              {address.slice(0, 6)}…{address.slice(-4)}
+              <span className="ml-1 text-steel">↗</span>
+            </a>
           </div>
 
           <div>
-            <div className="mb-1 text-[10px] tracking-[0.14em] text-ink-6 uppercase">
-              Balance · Base
+            <div className="mb-1.5 text-[10px] tracking-[0.14em] text-ink-6 uppercase">
+              Balances
             </div>
-            {loading ? (
-              <p className="text-[12px] text-ink-5">—</p>
-            ) : balances?.empty ? (
-              <p className="text-[12px] text-ink-5">No funds on Base yet</p>
-            ) : (
-              <dl className="grid grid-cols-2 gap-2 text-[13px]">
-                <div>
-                  <dt className="text-[10px] text-ink-6">ETH</dt>
-                  <dd className="tabular-nums text-ink">{balances?.eth ?? "—"}</dd>
+            <div className="grid grid-cols-2 gap-2.5">
+              {(["ethereum", "base"] as ChainKey[]).map((chain) => (
+                <div key={chain} className="rounded-lg border border-line-soft bg-ground px-3 py-2.5">
+                  <div className="mb-1.5 text-[11px] font-medium text-ink-3">{CHAINS[chain].label}</div>
+                  {loading ? (
+                    <p className="text-[12px] text-ink-5">…</p>
+                  ) : (
+                    <dl className="space-y-1 text-[13px]">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <dt className="text-[10px] text-ink-6">ETH</dt>
+                        <dd className="tabular-nums text-ink">{balances?.[chain]?.eth ?? "—"}</dd>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <dt className="text-[10px] text-ink-6">USDC</dt>
+                        <dd className="tabular-nums text-ink">{balances?.[chain]?.usdc ?? "—"}</dd>
+                      </div>
+                    </dl>
+                  )}
                 </div>
-                <div>
-                  <dt className="text-[10px] text-ink-6">USDC</dt>
-                  <dd className="tabular-nums text-ink">{balances?.usdc ?? "—"}</dd>
-                </div>
-              </dl>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <button className="btn flex-1" onClick={copy}>
-              Copy address
-            </button>
-            {fundWallet && (
-              <button
-                className="btn-primary flex-1"
-                onClick={() => fundWallet!({ address }).catch(() => {})}
-              >
-                Fund wallet
-              </button>
-            )}
+              ))}
+            </div>
           </div>
         </>
       )}

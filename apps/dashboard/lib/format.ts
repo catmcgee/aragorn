@@ -40,6 +40,7 @@ export const TEMPLATE_NAMES: Record<number, string> = {
   4: "Collateral Allocation",
   5: "Repo Agreement",
   6: "Entitlement",
+  7: "Strategy Position",
 };
 
 export const STATUS_DOT: Record<string, string> = {

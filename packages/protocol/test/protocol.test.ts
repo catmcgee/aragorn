@@ -37,7 +37,9 @@ test("commitment & nullifier are well-formed and deterministic", () => {
   const note = newNote(TemplateId.Cash, { owner_x: 5n, amount: 1_000_000n, salt2: 9n }, [5n]);
   const c1 = commitment(note);
   const c2 = commitment(note);
+  const sameLeafDifferentSecret = { ...note, noteSecret: note.noteSecret + 1n };
   expect(c1).toBe(c2);
+  expect(commitment(sameLeafDifferentSecret)).not.toBe(c1);
   expect(nullifier(c1, note.noteSecret)).not.toBe(nullifier(c1, note.noteSecret + 1n));
 });
 

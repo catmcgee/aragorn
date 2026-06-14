@@ -1,6 +1,6 @@
 // Party signatures (§3.4): Schnorr over Grumpkin, NEW scheme (Poseidon2+DST, D-003).
 // Signing uses the bbsign alias (bb.js nightly ≥ 20260519); the circuit verifies via
-// noir-lang/schnorr v0.4.0. Signed message: msg = Poseidon2([root, nullifiers..., commitments...]).
+// noir-lang/schnorr v0.4.0. Signed message: msg = Poseidon2([root, nullifiers..., commitments..., aux...]).
 import { BackendType, BarretenbergSync as SignApi } from "bbsign";
 import { type Field, fieldToU8, u8ToField } from "./field.ts";
 import { poseidon2 } from "./poseidon.ts";
@@ -47,8 +47,13 @@ export function signField(keys: PartyKeys, messageField: Field): Signature {
   return { sLo: sParts.lo, sHi: sParts.hi, eLo: eParts.lo, eHi: eParts.hi };
 }
 
-/** Transition message (§3.4): Poseidon2([root, all nullifiers..., all commitments...]),
+/** Transition message (§3.4): Poseidon2([root, all nullifiers..., all commitments..., aux...]),
  *  at each circuit's own arity (unpadded slots excluded by the circuit's fixed shape). */
-export function transitionMessage(root: Field, nullifiers: Field[], commitments: Field[]): Field {
-  return poseidon2([root, ...nullifiers, ...commitments]);
+export function transitionMessage(
+  root: Field,
+  nullifiers: Field[],
+  commitments: Field[],
+  aux: Field[] = [],
+): Field {
+  return poseidon2([root, ...nullifiers, ...commitments, ...aux]);
 }

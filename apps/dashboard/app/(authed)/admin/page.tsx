@@ -58,7 +58,6 @@ function UsersSection() {
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("trader");
-  const [actAs, setActAs] = useState("");
   const [limit, setLimit] = useState("");
   const [busy, setBusy] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -81,15 +80,10 @@ function UsersSection() {
     setInvited(null);
     setBusy(true);
     try {
-      const parties = actAs
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
       const limitMicro = limit.trim() ? usdcToMicro(limit) : undefined;
-      await client.inviteUser(email.trim(), role, parties, limitMicro);
+      await client.inviteUser(email.trim(), role, limitMicro);
       setInvited(`Invited ${email.trim()}`);
       setEmail("");
-      setActAs("");
       setLimit("");
       setRefresh((n) => n + 1);
     } catch (err) {
@@ -113,7 +107,6 @@ function UsersSection() {
             <tr>
               <th className="th">Email</th>
               <th className="th">Role</th>
-              <th className="th">Act as</th>
               <th className="th">Limit</th>
             </tr>
           </thead>
@@ -124,7 +117,6 @@ function UsersSection() {
                 <tr key={i} className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]">
                   <td className="td">{str(u, "email")}</td>
                   <td className="td">{str(u, "role")}</td>
-                  <td className="td font-mono text-xs">{str(u, "actAs", "act_as")}</td>
                   <td className="td tabular-nums">
                     {limitRaw ? fmtMicro(String(limitRaw)) : "—"}
                   </td>
@@ -161,16 +153,6 @@ function UsersSection() {
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="inv-actas">Act as (comma-separated)</label>
-            <input
-              id="inv-actas"
-              className="input w-full"
-              placeholder="UBS::trading, UBS::treasury"
-              value={actAs}
-              onChange={(e) => setActAs(e.target.value)}
-            />
           </div>
           <div>
             <label className="label" htmlFor="inv-limit">Limit (USDC, optional)</label>
@@ -295,7 +277,6 @@ function WhitelistSection() {
 
 function OmsSection() {
   const { client } = useRing();
-  const [actAs, setActAs] = useState("");
   const [maxNotional, setMaxNotional] = useState("");
   const [ttlHours, setTtlHours] = useState("24");
   const [busy, setBusy] = useState(false);
@@ -310,15 +291,11 @@ function OmsSection() {
     setCopied(false);
     setBusy(true);
     try {
-      const parties = actAs
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
       const maxMicro = maxNotional.trim() ? usdcToMicro(maxNotional) : undefined;
       const hours = ttlHours.trim() ? Number(ttlHours) : undefined;
       const ttlSeconds =
         hours !== undefined && Number.isFinite(hours) ? Math.round(hours * 3600) : undefined;
-      const res = await client.serviceToken(parties, maxMicro, ttlSeconds);
+      const res = await client.serviceToken(maxMicro, ttlSeconds);
       setBiscuit(res.biscuit);
     } catch (err) {
       setError(cleanError(err));
@@ -341,18 +318,7 @@ function OmsSection() {
         management system.
       </p>
       <form className="space-y-3" onSubmit={mint}>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="label" htmlFor="oms-actas">Act as (comma-separated)</label>
-            <input
-              id="oms-actas"
-              required
-              className="input w-full"
-              placeholder="UBS::trading"
-              value={actAs}
-              onChange={(e) => setActAs(e.target.value)}
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label" htmlFor="oms-max">Max notional (USDC, optional)</label>
             <input

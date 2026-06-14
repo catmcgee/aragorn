@@ -1,7 +1,7 @@
 // cash_unshield (circuit id 3): Cash note burned -> public USDC release.
 // Public aux: [amount, recipient_addr, 0, 0] - the contract pays `amount` to `recipient_addr`.
 // c1 = change note back to owner (always created, possibly zero-amount).
-use aragorn_lib::{cash_commitment, check_sig, merkle_root, nullifier, Sig, transition_msg_1x1};
+use aragorn_lib::{cash_commitment, check_sig, merkle_root, nullifier, Sig, transition_msg_1x1_aux2};
 
 fn main(
     root: pub Field,
@@ -25,6 +25,7 @@ fn main(
     change_amount: u64,
     change_salt: Field,
     change_salt2: Field,
+    change_secret: Field,
 ) {
     assert(t_bound == 0);
     assert(nullifiers[1] == 0);
@@ -37,7 +38,7 @@ fn main(
     assert(aux[3] == 0);
 
     // input existence + nullifier
-    let in1_c = cash_commitment(owner_x, in1_amount, in1_salt2, in1_salt);
+    let in1_c = cash_commitment(owner_x, in1_amount, in1_salt2, in1_secret, in1_salt);
     assert(merkle_root(in1_c, in1_index, in1_path) == root);
     assert(nullifiers[0] == nullifier(in1_c, in1_secret));
 
@@ -47,9 +48,9 @@ fn main(
     // aux[1] = recipient address: contract-consumed.
 
     // change note
-    assert(commitments[0] == cash_commitment(owner_x, change_amount, change_salt2, change_salt));
+    assert(commitments[0] == cash_commitment(owner_x, change_amount, change_salt2, change_secret, change_salt));
 
     // owner authorization
-    let msg = transition_msg_1x1(root, nullifiers[0], commitments[0]);
+    let msg = transition_msg_1x1_aux2(root, nullifiers[0], commitments[0], aux[0], aux[1]);
     check_sig(owner_x, owner_y, sig, msg);
 }

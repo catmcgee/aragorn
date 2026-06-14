@@ -15,11 +15,14 @@ export const TemplateId = {
   CollateralAllocation: 4,
   RepoAgreement: 5,
   Entitlement: 6,
-  // 7 reserved: StrategyPosition (roadmap)
+  // A private yield-strategy position: shielded cash deployed to Privy Earn, represented
+  // as a ZK-redeemable note (the principal claim). `amount` = principal so the projection
+  // picks it up like any other balance.
+  StrategyPosition: 7,
 } as const;
 export type TemplateId = (typeof TemplateId)[keyof typeof TemplateId];
 
-/** Circuit IDs (§3.8) — key the on-chain verifier registry, NOT template ids. */
+/** Circuit IDs (§3.8) — key the onchain verifier registry, NOT template ids. */
 export const CircuitId = {
   cash_shield: 1,
   cash_transfer: 2,
@@ -29,6 +32,8 @@ export const CircuitId = {
   repo_propose_allocate: 6,
   repo_accept: 7,
   repo_close: 8,
+  strategy_open: 9,
+  strategy_redeem: 10,
 } as const;
 export type CircuitName = keyof typeof CircuitId;
 export type CircuitId = (typeof CircuitId)[keyof typeof CircuitId];
@@ -76,4 +81,5 @@ export const PAYLOAD_FIELDS: Record<TemplateId, readonly string[]> = {
     "maturity_ts",
   ],
   [TemplateId.Entitlement]: ["claim_hash", "amount", "payer_x", "memo_hash"],
+  [TemplateId.StrategyPosition]: ["owner_x", "vault_id_hash", "amount", "open_ts"],
 } as const;

@@ -29,10 +29,12 @@ fn main(
     ent_amount: [u64; 3],
     ent_memo_hash: [Field; 3],
     ent_salt: [Field; 3],
+    ent_secret: [Field; 3],
     // change
     change_amount: u64,
     change_salt: Field,
     change_salt2: Field,
+    change_secret: Field,
 ) {
     assert(t_bound == 0);
     for i in 0..4 {
@@ -43,7 +45,7 @@ fn main(
     assert(nullifiers[3] == 0);
 
     // funding note: existence + nullifier
-    let in1_c = cash_commitment(payer_x, in1_amount, in1_salt2, in1_salt);
+    let in1_c = cash_commitment(payer_x, in1_amount, in1_salt2, in1_secret, in1_salt);
     assert(merkle_root(in1_c, in1_index, in1_path) == root);
     assert(nullifiers[0] == nullifier(in1_c, in1_secret));
 
@@ -52,7 +54,7 @@ fn main(
     let mut paid: u64 = 0;
     for i in 0..3 {
         let ph = entitlement_payload(ent_claim_hash[i], ent_amount[i], payer_x, ent_memo_hash[i]);
-        let c = commitment(TEMPLATE_ENTITLEMENT, ph, ent_sh, ent_salt[i]);
+        let c = commitment(TEMPLATE_ENTITLEMENT, ph, ent_sh, ent_secret[i], ent_salt[i]);
         if ent_real[i] {
             assert(commitments[i] == c);
             paid += ent_amount[i];
@@ -62,7 +64,7 @@ fn main(
     }
 
     // change (always created)
-    assert(commitments[3] == cash_commitment(payer_x, change_amount, change_salt2, change_salt));
+    assert(commitments[3] == cash_commitment(payer_x, change_amount, change_salt2, change_secret, change_salt));
 
     // conservation
     assert(in1_amount == paid + change_amount);

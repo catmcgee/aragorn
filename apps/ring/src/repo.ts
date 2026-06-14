@@ -1,5 +1,5 @@
 // Repo lifecycle (X4): propose+allocate -> atomic accept (DvP) -> time-warp -> auto-close.
-// State machine (BUILD_SPEC §6.3): proposals travel ON-CHAIN (the proposal note's encrypted
+// State machine (BUILD_SPEC §6.3): proposals travel ONCHAIN (the proposal note's encrypted
 // payload names the counterparty as stakeholder; their sync engine surfaces it) - no relay.
 import { readFileSync } from "fs";
 import {
@@ -133,7 +133,9 @@ export class RepoDesk {
         rate_bps: rateBps.toString(),
         term_days: days.toString(),
         proposal_salt: fieldToHex(proposalNote.salt),
+        proposal_secret: fieldToHex(proposalNote.noteSecret),
         allocation_salt: fieldToHex(allocationNote.salt),
+        allocation_secret: fieldToHex(allocationNote.noteSecret),
         sh_lo: fieldToHex(shLo),
         sh_hi: fieldToHex(shHi),
       });
@@ -167,7 +169,7 @@ export class RepoDesk {
     }
   }
 
-  /** Lender inbox: an inbound RepoProposal note appeared on-chain for us. */
+  /** Lender inbox: an inbound RepoProposal note appeared onchain for us. */
   private async onProposalNote(cid: string): Promise<void> {
     const [note] = await this.sql`SELECT * FROM notes WHERE cid = ${cid}`;
     if (!note) return;
@@ -319,12 +321,16 @@ export class RepoDesk {
         bond_issuer_x: fieldToHex(issuerX),
         maturity_ts: maturity.toString(),
         position_salt: fieldToHex(positionNote.salt),
+        position_secret: fieldToHex(positionNote.noteSecret),
         agreement_salt: fieldToHex(agreementNote.salt),
+        agreement_secret: fieldToHex(agreementNote.noteSecret),
         dealer_cash_salt: fieldToHex(dealerCashNote.salt),
         dealer_cash_salt2: fieldToHex(dealerCashNote.fields.salt2),
+        dealer_cash_secret: fieldToHex(dealerCashNote.noteSecret),
         change_amount: change.toString(),
         change_salt: fieldToHex(changeNote.salt),
         change_salt2: fieldToHex(changeNote.fields.salt2),
+        change_secret: fieldToHex(changeNote.noteSecret),
         sh_lo: fieldToHex(shLo),
         sh_hi: fieldToHex(shHi),
       });
@@ -449,10 +455,13 @@ export class RepoDesk {
         sig: sig4(sig),
         lender_cash_salt: fieldToHex(lenderCashNote.salt),
         lender_cash_salt2: fieldToHex(lenderCashNote.fields.salt2),
+        lender_cash_secret: fieldToHex(lenderCashNote.noteSecret),
         position_out_salt: fieldToHex(positionOutNote.salt),
+        position_out_secret: fieldToHex(positionOutNote.noteSecret),
         change_amount: change.toString(),
         change_salt: fieldToHex(changeNote.salt),
         change_salt2: fieldToHex(changeNote.fields.salt2),
+        change_secret: fieldToHex(changeNote.noteSecret),
         sh_lo: fieldToHex(shLo),
         sh_hi: fieldToHex(shHi),
       });

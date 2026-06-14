@@ -34,7 +34,9 @@ fn main(
     term_days: u64,
     // output salts/secrets
     proposal_salt: Field,
+    proposal_secret: Field,
     allocation_salt: Field,
+    allocation_secret: Field,
     // sorted two-party stakeholder pair for outputs
     sh_lo: Field,
     sh_hi: Field,
@@ -51,7 +53,7 @@ fn main(
 
     // consumed bond: dealer-owned, UNENCUMBERED, in tree
     let bond_ph = bond_payload(dealer_x, bond_issuer_x, bond_isin_hash, bond_face, 0);
-    let bond_c = commitment(TEMPLATE_BOND_POSITION, bond_ph, stakeholders_hash(bond_sh), bond_salt);
+    let bond_c = commitment(TEMPLATE_BOND_POSITION, bond_ph, stakeholders_hash(bond_sh), bond_secret, bond_salt);
     assert(merkle_root(bond_c, bond_index, bond_path) == root);
     assert(nullifiers[0] == nullifier(bond_c, bond_secret));
 
@@ -62,12 +64,12 @@ fn main(
     let prop_ph = repo_proposal_payload(
         dealer_x, lender_x, bond_isin_hash, bond_face, cash_amount, rate_bps, term_days,
     );
-    let proposal_c = commitment(TEMPLATE_REPO_PROPOSAL, prop_ph, pair_sh, proposal_salt);
+    let proposal_c = commitment(TEMPLATE_REPO_PROPOSAL, prop_ph, pair_sh, proposal_secret, proposal_salt);
     assert(commitments[0] == proposal_c);
 
     // c2: CollateralAllocation - fields tied to the proposal's collateral terms
     let alloc_ph = collateral_allocation_payload(dealer_x, proposal_c, bond_isin_hash, bond_face);
-    assert(commitments[1] == commitment(TEMPLATE_COLLATERAL_ALLOCATION, alloc_ph, pair_sh, allocation_salt));
+    assert(commitments[1] == commitment(TEMPLATE_COLLATERAL_ALLOCATION, alloc_ph, pair_sh, allocation_secret, allocation_salt));
 
     // dealer authorization
     let msg = transition_msg_1x2(root, nullifiers[0], commitments[0], commitments[1]);

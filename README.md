@@ -13,7 +13,7 @@ Canton is, stripped of branding, five primitives — a UTXO-shaped contract set,
 **On Ethereum (local Anvil settlement plane):**
 
 - **NoteRegistry** — the singleton settlement contract. An incremental Poseidon2 Merkle tree of note commitments (depth 32), a recent-roots ring buffer (64), a nullifier set, and a per-circuit verifier registry. Its entrypoint is `settle(circuitId, proof, publicInputs, ciphertexts[])`: verify the proof against a root in the window, check nullifier freshness, insert new commitments, emit `Settled`. A multi-leg DvP either fully lands or fully reverts.
-- **ShieldVault** — USDC custody at the asset boundary. `cash_shield` pulls USDC in (depositor pre-approves); `cash_unshield` releases it. Callable only by NoteRegistry on a valid proof.
+- **ShieldVault** — USDC custody at the asset boundary. Depositors pre-fund a commitment with `depositFor`; `cash_shield` consumes that escrow and `cash_unshield` releases USDC. Callable only by NoteRegistry on a valid proof.
 
 **Off Ethereum (the Ring node, one per institution — the product):**
 
@@ -23,7 +23,7 @@ Canton is, stripped of branding, five primitives — a UTXO-shaped contract set,
 - **Policy engine** — roles, per-user notional limits, and **four-eyes** approvals (an over-limit action becomes a `PendingApproval` that an approver must confirm before the Ring signs with the party key). ENS counterparty whitelist gates inbound/outbound proposals.
 - **Biscuit auth** — Privy login is exchanged for a short-lived, public-key-verified [Biscuit](https://biscuitsec.org) session token carrying the user's entitlements; service tokens are scoped and offline-attenuable. One enforcement path for humans and machines.
 
-**On-chain propose-accept (no message relay):** inter-Ring workflows travel through the chain itself — a proposal note names the counterparty as a stakeholder, and their sync engine surfaces it in their inbox. There is no off-chain messaging service to run.
+**Onchain propose-accept (no message relay):** inter-Ring workflows travel through the chain itself — a proposal note names the counterparty as a stakeholder, and their sync engine surfaces it in their inbox. There is no off-chain messaging service to run.
 
 **The dashboard** is a Next.js reference client: capability-driven rendering from the session Biscuit, a portfolio/blotter/inbox/admin, and a split-screen "what the world sees" public-view panel reading raw `Settled` events.
 
@@ -33,7 +33,7 @@ Settlement is carried by 8 Noir circuits sharing an `aragorn_lib` gadget crate:
 
 `cash_shield` · `cash_transfer` · `cash_unshield` · `cash_fanout` · `entitlement_claim` · `repo_propose_allocate` · `repo_accept` · `repo_close`
 
-On-chain verification uses **`bb`/UltraHonk Solidity verifiers** (`bb write_solidity_verifier`, one per circuit). Groth16 via World's ProveKit was the originally specified primary prover. ProveKit *does* now ship a gnark-based **recursive Groth16 wrapper** (it re-verifies a WHIR proof inside a gnark BN254 circuit and runs `groth16.Setup/Prove/Verify`) — but it stops off-chain: it never calls gnark's `vk.ExportSolidity()` and discards the proof rather than serializing EVM calldata, so there is **no on-chain Groth16 artifact today**. The spec's pre-declared fallback to native UltraHonk therefore stands. A cheaper Groth16 on-chain path is production roadmap (it needs the Solidity-export glue forked into ProveKit's Go + a per-circuit trusted setup); gas (~1.5–2M/verify) is irrelevant on local Anvil.
+Onchain verification uses **`bb`/UltraHonk Solidity verifiers** (`bb write_solidity_verifier`, one per circuit). Groth16 via World's ProveKit was the originally specified primary prover. ProveKit *does* now ship a gnark-based **recursive Groth16 wrapper** (it re-verifies a WHIR proof inside a gnark BN254 circuit and runs `groth16.Setup/Prove/Verify`) — but it stops off-chain: it never calls gnark's `vk.ExportSolidity()` and discards the proof rather than serializing EVM calldata, so there is **no onchain Groth16 artifact today**. The spec's pre-declared fallback to native UltraHonk therefore stands. A cheaper Groth16 onchain path is production roadmap (it needs the Solidity-export glue forked into ProveKit's Go + a per-circuit trusted setup); gas (~1.5–2M/verify) is irrelevant on local Anvil.
 
 The protocol in five lines:
 
@@ -63,11 +63,11 @@ Three planes: **settlement** on local Anvil (chain id 31337, MockUSDC), **identi
 | Poseidon2 (Yul) | `0x5fbdb2315678afecb367f032d93f642f64180aa3` |
 | Verifiers (8, one per circuit) | (deploy-time; see `contracts/deployments.local.json`) |
 
-The 8 per-circuit UltraHonk verifiers are vendored under `contracts/src/verifiers/`, deployed by `scripts/deploy.ts`, and registered in NoteRegistry's `circuitId → verifier` map; their addresses are assigned at deploy time (see `contracts/deployments.local.json`).
+The 10 per-circuit UltraHonk verifiers are vendored under `contracts/src/verifiers/`, deployed by `scripts/deploy.ts`, registered in NoteRegistry's `circuitId → verifier` map, and frozen at deploy; their addresses are assigned at deploy time (see `contracts/deployments.local.json`).
 
 ### Identity — ENS v2 (Sepolia)
 
-Identity is fully v2-native: names registered via the real v2 ETHRegistrar (commit-reveal), records on owner-deployed PermissionedResolver proxies, and — for the institution's own subtree — a **Ring-owned `PermissionedRegistry` subregistry** so departments are minted as real on-chain ERC-1155 subname tokens (not just wildcard records). Resolution walks v2's hierarchical registries; deepest resolver wins.
+Identity is fully v2-native: names registered via the real v2 ETHRegistrar (commit-reveal), records on owner-deployed PermissionedResolver proxies, and — for the institution's own subtree — a **Ring-owned `PermissionedRegistry` subregistry** so departments are minted as real onchain ERC-1155 subname tokens (not just wildcard records). Resolution walks v2's hierarchical registries; deepest resolver wins.
 
 **ENS v2 Sepolia contracts (canonical set):**
 
@@ -99,17 +99,17 @@ A premigration name `aragorn-rings.eth` carries the CCIP-Read employee gateway o
 
 ### ENS — the identity layer (there are no accounts, only names)
 
-ENS is not naming garnish in Aragorn — it *is* the account model. Institutions and their departments are ENS v2 names: `aragornrings.eth` is the 2LD, with per-org subnodes (`jpmorgan.aragornrings.eth`, `goldman.aragornrings.eth`) and department nodes (`treasury.<org>.aragornrings.eth`). Each name carries the records that make a counterparty resolvable rather than addressable: `aragorn.encpubkey` (the Ring's X25519 encryption key), `aragorn.endpoint`, `aragorn.partyroot`, and `aragorn.modules`, written on an **owner-deployed v2 PermissionedResolver proxy** (deployed through the VerifiableFactory with `ROLE_SET_ADDR | ROLE_SET_TEXT` bitmaps; D-012). Resolution walks v2's hierarchical registries and the deepest resolver wins — the on-chain analogue of an ENSIP-10 wildcard.
+ENS is not naming garnish in Aragorn — it *is* the account model. Institutions and their departments are ENS v2 names: `aragornrings.eth` is the 2LD, with per-org subnodes (`jpmorgan.aragornrings.eth`, `goldman.aragornrings.eth`) and department nodes (`treasury.<org>.aragornrings.eth`). Each name carries the records that make a counterparty resolvable rather than addressable: `aragorn.encpubkey` (the Ring's X25519 encryption key), `aragorn.endpoint`, `aragorn.partyroot`, and `aragorn.modules`, written on an **owner-deployed v2 PermissionedResolver proxy** (deployed through the VerifiableFactory with `ROLE_SET_ADDR | ROLE_SET_TEXT` bitmaps; D-012). Resolution walks v2's hierarchical registries and the deepest resolver wins — the onchain analogue of an ENSIP-10 wildcard.
 
-This is load-bearing in the code, not cosmetic: counterparty whitelisting *is* resolving a name and caching its records (`apps/ring/src/ens.ts`), every transfer routes a `.eth` spec through `resolveRecipient()` (`flows.ts`) — a 4+-label name reads a department's settlement party key live from ENS, a 2-/3-label name resolves a whitelisted org — and the Ring **boots by reading its own ENS records as the source of truth**, verifying the on-chain `encpubkey`/`partyroot` against its local keys and taking `enabledModules` from the name (`apps/ring/src/index.ts`).
+This is load-bearing in the code, not cosmetic: counterparty whitelisting *is* resolving a name and caching its records (`apps/ring/src/ens.ts`), every transfer routes a `.eth` spec through `resolveRecipient()` (`flows.ts`) — a 4+-label name reads a department's settlement party key live from ENS, a 2-/3-label name resolves a whitelisted org — and the Ring **boots by reading its own ENS records as the source of truth**, verifying the onchain `encpubkey`/`partyroot` against its local keys and taking `enabledModules` from the name (`apps/ring/src/index.ts`).
 
-Going further than records, an institution **owns its name's subtree on-chain**: provisioning deploys a per-institution `PermissionedRegistry` (the v2 `UserRegistry` impl) via the VerifiableFactory and attaches it with `setSubregistry` — the registrant already holds `ROLE_SET_SUBREGISTRY` from the ETHRegistrar, so no extra grant is needed — and then mints each department (`treasury`, `trading`) as a real **ERC-1155 subname token** it controls (`scripts/ens-v2-subregistry.ts`, live on `aragorn-sovereign.eth`, both departments verified resolving through UniversalResolverV2). Departments stop being wildcard records and become first-class on-chain entities the institution can mint and revoke itself. Employee identities (`cat.jpmorgan.aragornrings.eth`) are served as **CCIP-Read (ERC-3668) offchain subnames** by a signing gateway *inside the Ring*: the L1 resolver pins the org's signing key, so even a hosted gateway cannot forge a record, and employee names stay capabilities (shared bilaterally, non-enumerable) rather than a public directory. The product rule that falls out of all this: **no hex anywhere in the UI**.
+Going further than records, an institution **owns its name's subtree onchain**: provisioning deploys a per-institution `PermissionedRegistry` (the v2 `UserRegistry` impl) via the VerifiableFactory and attaches it with `setSubregistry` — the registrant already holds `ROLE_SET_SUBREGISTRY` from the ETHRegistrar, so no extra grant is needed — and then mints each department (`treasury`, `trading`) as a real **ERC-1155 subname token** it controls (`scripts/ens-v2-subregistry.ts`, live on `aragorn-sovereign.eth`, both departments verified resolving through UniversalResolverV2). Departments stop being wildcard records and become first-class onchain entities the institution can mint and revoke itself. Employee identities (`cat.jpmorgan.aragornrings.eth`) are served as **CCIP-Read (ERC-3668) offchain subnames** by a signing gateway *inside the Ring*: the L1 resolver pins the org's signing key, so even a hosted gateway cannot forge a record, and employee names stay capabilities (shared bilaterally, non-enumerable) rather than a public directory. The product rule that falls out of all this: **no hex anywhere in the UI**.
 
 ### World — ProveKit (Track D)
 
 The payroll claim is the one consumer-shaped flow in the system, and it is proved **client-side, in the employee's browser** — the witness (salary, note secrets, `claim_secret`) never leaves their device (`apps/dashboard` runs the prover in a web worker). The `entitlement_claim` circuit is deliberately **pure-Poseidon** (secret-knowledge auth, no embedded-curve operations) precisely so it is backend-portable across proving systems.
 
-For World Track D specifically, that same circuit is proved through **ProveKit's Noir → R1CS → WHIR pipeline** as a standalone spike (`spikes/provekit-booth/`): proven under `provekit-cli` with off-chain verification (an accepted Track D target environment) and **bit-for-bit hash-compatible with `bb.js`**. Honest scope: ProveKit's in-browser SDK (Verity) is blocked by an upstream build-version mismatch, so the ProveKit proof is CLI-level, while the in-dashboard browser claim uses `bb.js`/UltraHonk WASM. On-chain settlement also uses `bb`/UltraHonk — ProveKit's WHIR proofs have no EVM verifier, and its recursive Groth16 wrapper, while real, still exports no Solidity verifier (see *The eight circuits* above). So ProveKit is a legitimate Track-D proving target for the claim circuit, not a load-bearing part of the settlement path.
+For World Track D specifically, that same circuit is proved through **ProveKit's Noir → R1CS → WHIR pipeline** as a standalone spike (`spikes/provekit-booth/`): proven under `provekit-cli` with off-chain verification (an accepted Track D target environment) and **bit-for-bit hash-compatible with `bb.js`**. Honest scope: ProveKit's in-browser SDK (Verity) is blocked by an upstream build-version mismatch, so the ProveKit proof is CLI-level, while the in-dashboard browser claim uses `bb.js`/UltraHonk WASM. Onchain settlement also uses `bb`/UltraHonk — ProveKit's WHIR proofs have no EVM verifier, and its recursive Groth16 wrapper, while real, still exports no Solidity verifier (see *The eight circuits* above). So ProveKit is a legitimate Track-D proving target for the claim circuit, not a load-bearing part of the settlement path.
 
 ### Privy — auth, the funding wallet, and yield
 
@@ -193,7 +193,7 @@ sequenceDiagram
     Note over JPM: Trader books $5M overnight vs the Treasury note<br/>(over limit → four-eyes approval folds into the booking)
     JPM->>ETH: settle(repo_propose_allocate)<br/>RepoProposal + CollateralAllocation (bond locked)
     Note over ETH,GS: proposal note names Goldman as stakeholder
-    ETH-->>GS: sync engine surfaces proposal in inbox (on-chain, no relay)
+    ETH-->>GS: sync engine surfaces proposal in inbox (onchain, no relay)
     Note over GS: credit/limits checks run node-side
     GS->>ETH: settle(repo_accept) — ATOMIC DvP<br/>cash → JPM, encumbered bond → GS, RepoAgreement born
     Note over JPM,GS: no moment where one side holds both legs

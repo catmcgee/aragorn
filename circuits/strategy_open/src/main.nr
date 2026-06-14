@@ -1,7 +1,8 @@
-// cash_transfer (circuit id 2): n-in/2-out Cash. Owner auth (Schnorr), conservation.
-// Inputs: n1 mandatory, n2 optional (in2_real). Outputs: c1 -> recipient, c2 -> change to owner
-// (always created, possibly zero-amount, for uniform shape).
-use aragorn_lib::{cash_commitment, check_sig, merkle_root, nullifier, Sig, transition_msg_2x2};
+// strategy_open (circuit id 9): n-in Cash -> StrategyPosition + Cash change. Owner auth
+// (Schnorr), conservation. Mirrors cash_transfer, but output[0] is a StrategyPosition note
+// (the private claim on the deployed principal) instead of a Cash note to a recipient.
+// The matching real-yield leg (Privy Earn deposit) happens off-circuit in the ring flow.
+use aragorn_lib::{cash_commitment, check_sig, merkle_root, nullifier, strategy_commitment, Sig, transition_msg_2x2};
 
 fn main(
     root: pub Field,
@@ -9,14 +10,14 @@ fn main(
     nullifiers: pub [Field; 4],
     commitments: pub [Field; 4],
     aux: pub [Field; 4],
-    // input note 1 (mandatory)
+    // input note 1 (mandatory Cash)
     in1_amount: u64,
     in1_salt: Field,
     in1_salt2: Field,
     in1_secret: Field,
     in1_index: u32,
     in1_path: [Field; 32],
-    // input note 2 (optional)
+    // input note 2 (optional Cash)
     in2_real: bool,
     in2_amount: u64,
     in2_salt: Field,
@@ -28,12 +29,13 @@ fn main(
     owner_x: Field,
     owner_y: Field,
     sig: Sig,
-    // outputs
-    recipient_x: Field,
-    out1_amount: u64,
-    out1_salt: Field,
-    out1_salt2: Field,
-    out1_secret: Field,
+    // output 0: the StrategyPosition note (principal claim)
+    vault_id_hash: Field,
+    principal: u64,
+    open_ts: Field,
+    pos_salt: Field,
+    pos_secret: Field,
+    // output 1: Cash change back to the owner
     change_amount: u64,
     change_salt: Field,
     change_salt2: Field,
@@ -58,19 +60,18 @@ fn main(
     if in2_real {
         assert(merkle_root(in2_c, in2_index, in2_path) == root);
         assert(nullifiers[1] == nullifier(in2_c, in2_secret));
-        // distinct notes (same-note double-input would otherwise conserve twice)
         assert(nullifiers[0] != nullifiers[1]);
     } else {
         assert(nullifiers[1] == 0);
     }
     let in_sum = in1_amount + (if in2_real { in2_amount } else { 0 });
 
-    // -- outputs
-    assert(commitments[0] == cash_commitment(recipient_x, out1_amount, out1_salt2, out1_secret, out1_salt));
+    // -- outputs: position note (principal) + cash change
+    assert(commitments[0] == strategy_commitment(owner_x, vault_id_hash, principal, open_ts, pos_secret, pos_salt));
     assert(commitments[1] == cash_commitment(owner_x, change_amount, change_salt2, change_secret, change_salt));
 
     // -- conservation (u64 arithmetic: overflow checked by Noir)
-    assert(in_sum == out1_amount + change_amount);
+    assert(in_sum == principal + change_amount);
 
     // -- owner authorization over the exact transition
     let msg = transition_msg_2x2(root, nullifiers[0], nullifiers[1], commitments[0], commitments[1]);

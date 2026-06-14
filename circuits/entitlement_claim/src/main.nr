@@ -26,6 +26,7 @@ fn main(
     out_owner_x: Field,
     out_salt: Field,
     out_salt2: Field,
+    out_secret: Field,
 ) {
     assert(t_bound == 0);
     for i in 0..4 {
@@ -47,11 +48,12 @@ fn main(
         TEMPLATE_ENTITLEMENT,
         ph,
         stakeholders_hash([ent_payer_x, 0, 0, 0]),
+        ent_secret,
         ent_salt,
     );
     assert(merkle_root(ent_c, ent_index, ent_path) == root);
     assert(nullifiers[0] == nullifier(ent_c, ent_secret));
 
     // cash out: amount preserved exactly
-    assert(commitments[0] == cash_commitment(out_owner_x, ent_amount, out_salt2, out_salt));
+    assert(commitments[0] == cash_commitment(out_owner_x, ent_amount, out_salt2, out_secret, out_salt));
 }

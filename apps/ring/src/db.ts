@@ -53,11 +53,11 @@ export async function migrate(sql: Sql): Promise<void> {
       email TEXT UNIQUE NOT NULL,
       privy_did TEXT UNIQUE,
       role TEXT NOT NULL,
-      act_as TEXT[] NOT NULL DEFAULT '{}',
-      read_as TEXT[] NOT NULL DEFAULT '{}',
+      allowed_parties TEXT[],
       notional_limit_micro BIGINT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_parties TEXT[]`;
   await sql`
     CREATE TABLE IF NOT EXISTS workflows (
       id SERIAL PRIMARY KEY,
@@ -108,6 +108,23 @@ export async function migrate(sql: Sql): Promise<void> {
       resolved_at TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'active'
     )`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS strategy_ops (
+      id SERIAL PRIMARY KEY,
+      kind TEXT NOT NULL,                              -- deposit | withdraw
+      position_cid TEXT,
+      amount_micro BIGINT NOT NULL,
+      status TEXT NOT NULL,
+      result JSONB NOT NULL DEFAULT '{}',
+      requested_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`;
+  await sql`CREATE INDEX IF NOT EXISTS strategy_ops_position_idx ON strategy_ops(position_cid, status)`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS strategy_ops_active_withdraw_idx
+    ON strategy_ops(position_cid)
+    WHERE kind = 'withdraw' AND status IN ('withdrawing_from_earn', 'withdrawn_pending_redeem')`;
 }
 
 export async function audit(sql: Sql, actor: string, action: string, detail: unknown): Promise<void> {

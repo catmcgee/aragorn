@@ -95,7 +95,7 @@ function bondFace(c: ContractRow): string {
 }
 
 export default function RepoPage() {
-  const { client, me, ringUrl, tick, openPublic } = useRing();
+  const { client, ringUrl, tick, openPublic } = useRing();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [bonds, setBonds] = useState<ContractRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -103,10 +103,8 @@ export default function RepoPage() {
 
   // book form
   const [collateralCid, setCollateralCid] = useState("");
-  // dealer party defaults to where collateral lives (trading desk holds the bonds), not actAs[0]
-  const [dealerParty, setDealerParty] = useState(
-    me.user.actAs.includes("trading") ? "trading" : (me.user.actAs[0] ?? "trading"),
-  );
+  // dealer party defaults to where collateral lives (the trading desk holds the bonds)
+  const [dealerParty, setDealerParty] = useState("trading");
   // counterparty defaults to the first whitelisted name (set in the effect below), not a hardcode
   const [counterpartyEns, setCounterpartyEns] = useState("");
   const [cash, setCash] = useState("");

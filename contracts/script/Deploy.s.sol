@@ -14,6 +14,8 @@ import {EntitlementClaimVerifier} from "../src/verifiers/EntitlementClaimVerifie
 import {RepoProposeAllocateVerifier} from "../src/verifiers/RepoProposeAllocateVerifier.sol";
 import {RepoAcceptVerifier} from "../src/verifiers/RepoAcceptVerifier.sol";
 import {RepoCloseVerifier} from "../src/verifiers/RepoCloseVerifier.sol";
+import {StrategyOpenVerifier} from "../src/verifiers/StrategyOpenVerifier.sol";
+import {StrategyRedeemVerifier} from "../src/verifiers/StrategyRedeemVerifier.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -33,6 +35,13 @@ contract Deploy is Script {
         registry.setVerifier(6, IVerifier(address(new RepoProposeAllocateVerifier())));
         registry.setVerifier(7, IVerifier(address(new RepoAcceptVerifier())));
         registry.setVerifier(8, IVerifier(address(new RepoCloseVerifier())));
+        registry.setVerifier(9, IVerifier(address(new StrategyOpenVerifier())));
+        registry.setVerifier(10, IVerifier(address(new StrategyRedeemVerifier())));
+
+        // Lock the verifier set: after this, setVerifier reverts ("registry: frozen"),
+        // so the owner can never swap in a malicious verifier to forge notes. Seeding
+        // (seedCommitments) is gated separately by `seeded`, so this does not block the seed.
+        registry.freezeVerifiers();
 
         vm.stopBroadcast();
 

@@ -32,7 +32,7 @@ const email =
 const invite = await fetch(`${RING}/v1/users/invite`, {
   method: "POST",
   headers: { "content-type": "application/json", authorization: "Bearer ubs-api-token" },
-  body: JSON.stringify({ email, role: "trader", actAs: ["treasury"], limitMicro: "1000000000" }),
+  body: JSON.stringify({ email, role: "trader", limitMicro: "1000000000" }),
 });
 if (!invite.ok) throw new Error(`invite failed: ${await invite.text()}`);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cleanError } from "@aragorn/sdk";
 import type { ContractRow, Portfolio } from "@aragorn/sdk";
 import { useRing } from "@/lib/ring";
@@ -22,6 +23,25 @@ const STATUS_PILL: Record<ContractRow["status"], string> = {
   pending_consume: "pill pill-neutral",
   consumed: "pill pill-neutral",
 };
+
+// Where each contract "lives" in the dashboard — clicking a row jumps to the module
+// that owns that template so you can see it in context.
+function routeFor(c: ContractRow): string {
+  switch (c.template_id) {
+    case 1: // Cash
+      return c.owner_party === "strategy" ? "/strategies" : "/transfer";
+    case 2: // Bond Position → the issuer registry
+      return "/issuance";
+    case 3: // Repo Proposal
+    case 4: // Collateral Allocation
+    case 5: // Repo Agreement
+      return "/repo";
+    case 6: // Entitlement → payroll
+      return "/payroll";
+    default:
+      return "/portfolio";
+  }
+}
 
 function isEncumberedBond(c: ContractRow): boolean {
   if (c.template_id !== 2) return false;
@@ -47,6 +67,7 @@ function sumMicro(balances: Record<string, string>): string {
 
 export default function PortfolioPage() {
   const { client, tick } = useRing();
+  const router = useRouter();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [contracts, setContracts] = useState<ContractRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -199,7 +220,7 @@ export default function PortfolioPage() {
               <div className="flex items-center gap-2.5 mb-2">
                 <span className="h-[3px] w-4 rounded-sm bg-gold shrink-0" />
                 <span className="text-[11px] tracking-[0.14em] uppercase text-ink-4">
-                  {partyLabel(party)}
+                  {party === "—" ? "Agreements & escrow" : partyLabel(party)}
                 </span>
                 <span className="text-[10.5px] text-ink-6">
                   {rows.length} {rows.length === 1 ? "position" : "positions"}
@@ -215,6 +236,7 @@ export default function PortfolioPage() {
                       <th className="th">Holder</th>
                       <th className="th-num">Amount</th>
                       <th className="th">Status</th>
+                      <th className="th">Onchain</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -223,9 +245,11 @@ export default function PortfolioPage() {
                       return (
                         <tr
                           key={c.cid}
-                          className="border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                          onClick={() => router.push(routeFor(c))}
+                          className="cursor-pointer border-t border-line-soft hover:bg-[rgb(23_32_42/0.035)]"
+                          title="Open where this contract lives"
                         >
-                          <td className="td">
+                          <td className="td" onClick={(e) => e.stopPropagation()}>
                             <HashChip value={c.cid} />
                           </td>
                           <td className="td">
@@ -261,6 +285,9 @@ export default function PortfolioPage() {
                                 {c.status}
                               </span>
                             )}
+                          </td>
+                          <td className="td" onClick={(e) => e.stopPropagation()}>
+                            <HashChip value={c.created_tx} kind="tx" />
                           </td>
                         </tr>
                       );

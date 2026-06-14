@@ -1,6 +1,6 @@
-// P3 helper: query the Ring's CCIP gateway directly the way an on-chain OffchainResolver
+// P3 helper: query the Ring's CCIP gateway directly the way an onchain OffchainResolver
 // callback would, and verify the signed response (off-chain leg of ENSIP-10).
-// The on-chain resolver leg is exercised separately once deployed on Sepolia.
+// The onchain resolver leg is exercised separately once deployed on Sepolia.
 import {
   decodeAbiParameters,
   encodeAbiParameters,

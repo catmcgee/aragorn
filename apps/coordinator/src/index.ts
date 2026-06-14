@@ -1,13 +1,30 @@
 // Coordinator (BUILD_SPEC §6.4) — deliberately tiny: the relayer. Pays gas so Rings never
 // hold ETH; the chain never links settlements to an institution's wallet.
-// Directory = ENS; proposals travel on-chain. No other responsibilities.
+// Directory = ENS; proposals travel onchain. No other responsibilities.
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { createPublicClient, createWalletClient, http, namehash, parseAbi } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  decodeFunctionData,
+  http,
+  isAddress,
+  isHex,
+  namehash,
+  parseAbi,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry, sepolia } from "viem/chains";
 import { x25519 } from "@noble/curves/ed25519.js";
-import { initSchnorr, derivePartyKeys, randomField, fieldToHex } from "@aragorn/protocol";
+import {
+  CircuitId,
+  NOTE_REGISTRY_ABI,
+  PUBLIC_INPUT_COUNT,
+  initSchnorr,
+  derivePartyKeys,
+  randomField,
+  fieldToHex,
+} from "@aragorn/protocol";
 import { readFileSync } from "node:fs";
 import crypto from "node:crypto";
 import postgres from "postgres";
@@ -29,6 +46,19 @@ const PORT = Number(process.env.PORT ?? 4900);
 const TOKENS: Record<string, string> = JSON.parse(
   process.env.RELAYER_TOKENS ?? '{"ubs-relay-token":"UBS","drw-relay-token":"DRW"}',
 );
+const deployFile =
+  process.env.CHAIN === "sepolia"
+    ? "contracts/deployments.sepolia.json"
+    : "contracts/deployments.local.json";
+let deployRegistry: string | undefined;
+try {
+  deployRegistry = (JSON.parse(readFileSync(deployFile, "utf8")) as { registry?: string }).registry;
+} catch {}
+const NOTE_REGISTRY_ADDR = process.env.NOTE_REGISTRY_ADDR ?? deployRegistry;
+const ALLOWED_CIRCUITS = new Set<number>(Object.values(CircuitId).map(Number));
+const MAX_RELAY_CALLDATA_BYTES = Number(process.env.MAX_RELAY_CALLDATA_BYTES ?? 500_000);
+const MAX_RELAY_PROOF_BYTES = Number(process.env.MAX_RELAY_PROOF_BYTES ?? 250_000);
+const MAX_RELAY_CIPHERTEXTS = Number(process.env.MAX_RELAY_CIPHERTEXTS ?? 16);
 
 const account = privateKeyToAccount(RELAYER_KEY);
 const pub = createPublicClient({ chain: CHAIN, transport: http(RPC) });
@@ -42,6 +72,37 @@ function rateLimited(org: string): boolean {
   w.push(now);
   windows.set(org, w);
   return w.length > 30;
+}
+
+function hexByteLength(hex: string): number {
+  return hex.startsWith("0x") ? (hex.length - 2) / 2 : hex.length / 2;
+}
+
+function relayError(message: string, status: number): Error & { status: number } {
+  return Object.assign(new Error(message), { status });
+}
+
+function validateRelay(to: string, calldata: string): void {
+  if (!NOTE_REGISTRY_ADDR) throw relayError("note registry address not configured", 500);
+  if (!isAddress(to)) throw relayError("bad relay target", 400);
+  if (to.toLowerCase() !== NOTE_REGISTRY_ADDR.toLowerCase()) {
+    throw relayError("relay target not allowed", 403);
+  }
+  if (!isHex(calldata) || hexByteLength(calldata) > MAX_RELAY_CALLDATA_BYTES) {
+    throw relayError("bad relay calldata", 400);
+  }
+  const decoded = decodeFunctionData({ abi: NOTE_REGISTRY_ABI, data: calldata });
+  if (decoded.functionName !== "settle") throw relayError("only NoteRegistry.settle may be relayed", 403);
+  const [circuitId, proof, publicInputs, ciphertexts] = decoded.args as readonly [
+    number | bigint,
+    `0x${string}`,
+    readonly `0x${string}`[],
+    readonly `0x${string}`[],
+  ];
+  if (!ALLOWED_CIRCUITS.has(Number(circuitId))) throw relayError("unsupported circuit id", 400);
+  if (publicInputs.length !== PUBLIC_INPUT_COUNT) throw relayError("bad public input count", 400);
+  if (hexByteLength(proof) > MAX_RELAY_PROOF_BYTES) throw relayError("proof too large", 400);
+  if (ciphertexts.length > MAX_RELAY_CIPHERTEXTS) throw relayError("too many ciphertexts", 400);
 }
 
 const app = new Hono();
@@ -95,7 +156,7 @@ app.post("/provision", async (c) => {
     const port = 4003 + provisioned.size;
     if (usedPorts.has(port)) return c.json({ error: `port ${port} taken` }, 409);
 
-    // ── on-chain config from disk (coordinator cwd = repo root) ──
+    // ── onchain config from disk (coordinator cwd = repo root) ──
     const deployFile =
       process.env.CHAIN === "sepolia"
         ? "contracts/deployments.sepolia.json"
@@ -238,7 +299,7 @@ app.post("/provision", async (c) => {
     const inviteRes = await fetch(`${ringUrl}/v1/users/invite`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiToken}` },
-      body: JSON.stringify({ email: founderEmail, role: "admin", actAs: ["treasury"] }),
+      body: JSON.stringify({ email: founderEmail, role: "admin" }),
     });
     if (!inviteRes.ok) {
       const t = await inviteRes.text();
@@ -294,12 +355,13 @@ app.post("/relay", async (c) => {
 
   const { to, calldata } = await c.req.json<{ to: `0x${string}`; calldata: `0x${string}` }>();
   try {
+    validateRelay(to, calldata);
     const hash = await wallet.sendTransaction({ to, data: calldata });
     const receipt = await pub.waitForTransactionReceipt({ hash });
     return c.json({ txid: hash, status: receipt.status, blockNumber: Number(receipt.blockNumber) });
   } catch (e: any) {
     console.error(`[relay:${org}]`, e.shortMessage ?? e.message);
-    return c.json({ error: e.shortMessage ?? "relay failed" }, 400);
+    return c.json({ error: e.shortMessage ?? e.message ?? "relay failed" }, e.status ?? 400);
   }
 });
 

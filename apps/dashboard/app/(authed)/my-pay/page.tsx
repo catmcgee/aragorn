@@ -214,7 +214,7 @@ export default function MyPayPage() {
               Proof was generated on this device; only the proof was submitted.
             </p>
             <p className="mt-2 flex items-center gap-1 font-mono text-xs text-ink-3">
-              tx: <HashChip value={phase.txid} />
+              tx: <HashChip value={phase.txid} kind="tx" />
             </p>
           </div>
         )}

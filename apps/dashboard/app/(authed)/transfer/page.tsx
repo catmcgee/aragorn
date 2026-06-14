@@ -152,7 +152,7 @@ export default function TransferPage() {
         {result?.txid && (
           <p className="flex items-center gap-2 text-sm text-pos">
             <SettlementRing state="final" title="final" />
-            Settled — tx <HashChip value={result.txid} />
+            Settled — tx <HashChip value={result.txid} kind="tx" />
           </p>
         )}
       </form>

@@ -82,6 +82,8 @@ const VERIFIERS: [number, string][] = [
   [6, "RepoProposeAllocateVerifier"],
   [7, "RepoAcceptVerifier"],
   [8, "RepoCloseVerifier"],
+  [9, "StrategyOpenVerifier"],
+  [10, "StrategyRedeemVerifier"],
 ];
 for (const [id, name] of VERIFIERS) {
   const file = `${name}.sol`;
@@ -95,6 +97,7 @@ for (const [id, name] of VERIFIERS) {
   const addr = await deploy(file, name, [], libs);
   await send(registry, registryArt.abi, "setVerifier", [id, addr]);
 }
+await send(registry, registryArt.abi, "freezeVerifiers", []);
 
 writeFileSync(
   OUT,

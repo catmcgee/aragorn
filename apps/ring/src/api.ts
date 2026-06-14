@@ -22,8 +22,8 @@ type Vars = { Variables: { user: SessionUser } };
 const SERVICE_ADMIN: SessionUser = {
   email: "service-admin",
   role: "admin",
-  actAs: ["*"],
   limitMicro: null,
+  allowedParties: null,
   service: true,
 };
 
@@ -65,8 +65,8 @@ export function buildApi(
         user: {
           email: result.user.email,
           role: result.user.role,
-          actAs: result.user.actAs,
           limitMicro: result.user.limitMicro?.toString() ?? null,
+          allowedParties: result.user.allowedParties,
         },
       });
     } catch (e: any) {
@@ -95,17 +95,179 @@ export function buildApi(
     if (!roles.includes(user.role)) throw Object.assign(new Error("forbidden"), { status: 403 });
     return user;
   };
+  const defaultAllowedParties = (role: Role, allowedParties: unknown): string[] | null => {
+    if (Array.isArray(allowedParties)) return allowedParties.map(String).filter(Boolean);
+    if (role === "trader") return [Object.keys(cfg.partyKeys)[0] ?? "treasury"];
+    return null;
+  };
+  const requireParty = (user: SessionUser, party: string | null | undefined): void => {
+    if (!party || user.allowedParties === null) return;
+    if (!user.allowedParties.includes(party)) {
+      throw Object.assign(new Error(`forbidden for party ${party}`), { status: 403 });
+    }
+  };
   const onError = (c: any, e: any) => {
     const code = e.status ?? (e.message?.startsWith("CONTENTION") ? 409 : 400);
+    if (code === 202) return c.json({ status: e.kind ?? "pending", error: e.message }, 202);
     return c.json({ error: e.message }, code);
+  };
+
+  const pendingApproval = async (
+    kind: string,
+    state: Record<string, unknown>,
+    requestedBy: string,
+    amountMicro: string,
+  ) => {
+    const [wf] = await sql`
+      INSERT INTO workflows (kind, state, status, created_by)
+      VALUES (${kind}, ${sql.json(state as any)}, 'pending_approval', ${requestedBy})
+      RETURNING id`;
+    const [approval] = await sql`
+      INSERT INTO approvals (workflow_id, requested_by, amount)
+      VALUES (${wf.id}, ${requestedBy}, ${amountMicro}) RETURNING id`;
+    chain.emitExternal({
+      type: "approval_pending",
+      approvalId: approval.id,
+      workflowId: wf.id,
+      kind,
+      requestedBy,
+      amountMicro,
+    });
+    return { status: "pending_approval", approvalId: approval.id, workflowId: wf.id };
+  };
+
+  const executeStrategyDeposit = async (
+    actor: SessionUser,
+    amountMicro: string,
+    fromParty?: string,
+  ): Promise<any> => {
+    const party = fromParty ?? "treasury";
+    requireParty(actor, party);
+    const amount = BigInt(amountMicro);
+    const openTs = BigInt(Math.floor(Date.now() / 1000));
+    const [op] = await sql`
+      INSERT INTO strategy_ops (kind, amount_micro, status, requested_by)
+      VALUES ('deposit', ${amountMicro}, 'opening_private_note', ${actor.email})
+      RETURNING id`;
+    let position: { txid: string; cid: string } | undefined;
+    try {
+      position = await flows.openStrategy(party, earn.vaultLabel, amount, openTs);
+      await sql`
+        UPDATE strategy_ops SET position_cid = ${position.cid}, status = 'private_note_opened',
+          result = result || ${sql.json({ openTxid: position.txid } as any)}, updated_at = now()
+        WHERE id = ${op.id}`;
+      try {
+        const result = await earn.deposit(amount);
+        await sql`
+          UPDATE strategy_ops SET status = 'deployed',
+            result = result || ${sql.json({ earn: result } as any)}, updated_at = now()
+          WHERE id = ${op.id}`;
+        await audit(sql, actor.email, "earn_deposit", { amountMicro, fromParty: party, cid: position.cid, txid: position.txid });
+        chain.emitExternal({ type: "workflow_updated", kind: "strategy", state: "deployed" });
+        return { ...result, position };
+      } catch (e) {
+        try {
+          const compensation = await flows.redeemStrategy(party, position.cid);
+          await sql`
+            UPDATE strategy_ops SET status = 'compensated_after_earn_failure',
+              result = result || ${sql.json({ compensation } as any)}, updated_at = now()
+            WHERE id = ${op.id}`;
+        } catch (compensationError: any) {
+          await sql`
+            UPDATE strategy_ops SET status = 'earn_failed_compensation_failed',
+              result = result || ${sql.json({ error: String((e as Error).message), compensationError: String(compensationError?.message ?? compensationError) } as any)},
+              updated_at = now()
+            WHERE id = ${op.id}`;
+        }
+        throw e;
+      }
+    } catch (e: any) {
+      await sql`
+        UPDATE strategy_ops SET status = CASE
+            WHEN status IN ('compensated_after_earn_failure','earn_failed_compensation_failed') THEN status
+            ELSE 'failed'
+          END,
+          result = result || ${sql.json({ error: String(e?.message ?? e) } as any)}, updated_at = now()
+        WHERE id = ${op.id}`;
+      throw e;
+    }
+  };
+
+  const executeStrategyWithdraw = async (actor: SessionUser, positionCid: string): Promise<any> => {
+    const [existing] = await sql`
+      SELECT * FROM strategy_ops
+      WHERE kind = 'withdraw' AND position_cid = ${positionCid}
+        AND status IN ('withdrawing_from_earn', 'withdrawn_pending_redeem')
+      ORDER BY id DESC LIMIT 1`;
+    if (existing?.status === "withdrawing_from_earn") {
+      throw Object.assign(new Error("strategy withdraw already in progress"), { status: 409 });
+    }
+    const [pos] = await sql`
+      SELECT owner_party, amount_micro FROM notes
+      WHERE cid = ${positionCid} AND template_id = 7 AND status = 'active'`;
+    if (!pos && !existing) throw Object.assign(new Error("no active strategy position with that id"), { status: 404 });
+    const ownerParty = pos?.owner_party ?? existing.result.owner;
+    requireParty(actor, ownerParty);
+    const amount = BigInt(pos?.amount_micro ?? existing.amount_micro);
+    let op = existing;
+    if (!op) {
+      try {
+        op = (await sql`
+          INSERT INTO strategy_ops (kind, position_cid, amount_micro, status, requested_by)
+          VALUES ('withdraw', ${positionCid}, ${amount.toString()}, 'withdrawing_from_earn', ${actor.email})
+          RETURNING *`)[0];
+      } catch (e: any) {
+        if (e?.code === "23505") {
+          throw Object.assign(new Error("strategy withdraw already in progress"), { status: 409 });
+        }
+        throw e;
+      }
+    }
+    let result = existing?.result?.earn ?? { resumed: true };
+    if (!existing) {
+      try {
+        result = await earn.withdraw(amount);
+      } catch (e: any) {
+        await sql`
+          UPDATE strategy_ops SET status = 'failed',
+            result = result || ${sql.json({ withdrawError: String(e?.message ?? e), owner: ownerParty } as any)},
+            updated_at = now()
+          WHERE id = ${op.id}`;
+        throw e;
+      }
+      await sql`
+        UPDATE strategy_ops SET status = 'withdrawn_pending_redeem',
+          result = result || ${sql.json({ earn: result, owner: ownerParty } as any)}, updated_at = now()
+        WHERE id = ${op.id}`;
+    }
+    try {
+      const redeemed = await flows.redeemStrategy(ownerParty, positionCid);
+      await sql`
+        UPDATE strategy_ops SET status = 'redeemed',
+          result = result || ${sql.json({ redeemed } as any)}, updated_at = now()
+        WHERE id = ${op.id}`;
+      await audit(sql, actor.email, "earn_withdraw", { positionCid, owner: ownerParty, txid: redeemed.txid });
+      chain.emitExternal({ type: "workflow_updated", kind: "strategy", state: "redeemed" });
+      return { ...result, redeemed };
+    } catch (e: any) {
+      await sql`
+        UPDATE strategy_ops SET status = 'withdrawn_pending_redeem',
+          result = result || ${sql.json({ redeemError: String(e?.message ?? e), owner: ownerParty } as any)}, updated_at = now()
+        WHERE id = ${op.id}`;
+      throw Object.assign(new Error(`earn withdrawn; private redeem pending retry: ${e?.message ?? e}`), {
+        status: 202,
+        kind: "pending_redeem",
+      });
+    }
   };
 
   // ── session & org ─────────────────────────────────────────────────────────────────
   v1.get("/me", async (c) => {
     const user = c.get("user");
     return c.json({
-      user: { email: user.email, role: user.role, actAs: user.actAs },
+      user: { email: user.email, role: user.role },
       limitMicro: user.limitMicro?.toString() ?? null,
+      allowedParties: user.allowedParties,
       org: cfg.orgName,
       ens: process.env.RING_ENS ?? null,
       // Explorer links are valid only when SETTLEMENT runs on the chain the explorer serves.
@@ -162,14 +324,16 @@ export function buildApi(
   v1.post("/users/invite", async (c) => {
     try {
       const admin = requireRole(c, "admin");
-      const { email, role, actAs, limitMicro } = await c.req.json();
+      const { email, role, limitMicro, allowedParties } = await c.req.json();
+      const allowed = defaultAllowedParties(role as Role, allowedParties);
       const [row] = await sql`
-        INSERT INTO users (email, role, act_as, notional_limit_micro)
-        VALUES (${email}, ${role}, ${actAs ?? []}, ${limitMicro ?? null})
-        ON CONFLICT (email) DO UPDATE SET role = ${role}, act_as = ${actAs ?? []},
+        INSERT INTO users (email, role, allowed_parties, notional_limit_micro)
+        VALUES (${email}, ${role}, ${allowed as any}, ${limitMicro ?? null})
+        ON CONFLICT (email) DO UPDATE SET role = ${role},
+          allowed_parties = ${allowed as any},
           notional_limit_micro = ${limitMicro ?? null}
         RETURNING *`;
-      await audit(sql, admin.email, "invite_user", { email, role, actAs, limitMicro });
+      await audit(sql, admin.email, "invite_user", { email, role, limitMicro, allowedParties: allowed });
       return c.json({ user: row });
     } catch (e) {
       return onError(c, e);
@@ -179,7 +343,7 @@ export function buildApi(
   v1.get("/users", async (c) => {
     try {
       requireRole(c, "admin");
-      const rows = await sql`SELECT id, email, role, act_as, notional_limit_micro, privy_did IS NOT NULL AS activated, created_at FROM users ORDER BY id`;
+      const rows = await sql`SELECT id, email, role, allowed_parties, notional_limit_micro, privy_did IS NOT NULL AS activated, created_at FROM users ORDER BY id`;
       return c.json({ users: rows });
     } catch (e) {
       return onError(c, e);
@@ -189,14 +353,18 @@ export function buildApi(
   v1.put("/users/:id", async (c) => {
     try {
       const admin = requireRole(c, "admin");
-      const { role, actAs, limitMicro } = await c.req.json();
+      const { role, limitMicro, allowedParties } = await c.req.json();
+      const allowed =
+        allowedParties === undefined
+          ? undefined
+          : defaultAllowedParties((role ?? "trader") as Role, allowedParties);
       const [row] = await sql`
         UPDATE users SET
           role = COALESCE(${role ?? null}, role),
-          act_as = COALESCE(${actAs ?? null}, act_as),
+          allowed_parties = ${allowed === undefined ? sql`allowed_parties` : (allowed as any)},
           notional_limit_micro = ${limitMicro === undefined ? sql`notional_limit_micro` : limitMicro}
         WHERE id = ${c.req.param("id")} RETURNING *`;
-      await audit(sql, admin.email, "update_user", { id: c.req.param("id"), role, actAs, limitMicro });
+      await audit(sql, admin.email, "update_user", { id: c.req.param("id"), role, limitMicro, allowedParties: allowed });
       return c.json({ user: row });
     } catch (e) {
       return onError(c, e);
@@ -252,18 +420,20 @@ export function buildApi(
   v1.post("/service-tokens", async (c) => {
     try {
       const admin = requireRole(c, "admin");
-      const { actAs, maxNotionalMicro, ttlSeconds, role } = await c.req.json();
+      const { maxNotionalMicro, ttlSeconds, role, allowedParties } = await c.req.json();
+      const serviceRole = (role ?? "trader") as Role;
+      const allowed = allowedParties === undefined ? null : defaultAllowedParties(serviceRole, allowedParties);
       const token = auth.mint(
         {
           email: `service:${Date.now()}`,
-          role: (role ?? "trader") as Role,
-          actAs: actAs ?? [],
+          role: serviceRole,
           limitMicro: maxNotionalMicro ? BigInt(maxNotionalMicro) : null,
+          allowedParties: allowed,
           service: true,
         },
         ttlSeconds ?? 86400,
       );
-      await audit(sql, admin.email, "mint_service_token", { actAs, maxNotionalMicro, ttlSeconds });
+      await audit(sql, admin.email, "mint_service_token", { maxNotionalMicro, ttlSeconds, role, allowedParties: allowed });
       return c.json({ biscuit: token });
     } catch (e) {
       return onError(c, e);
@@ -280,20 +450,38 @@ export function buildApi(
   });
 
   v1.get("/contracts", async (c) => {
+    const user = c.get("user");
     const template = c.req.query("template");
     const party = c.req.query("party");
-    const rows = await sql`
+    if (party) requireParty(user, party);
+    const parties = user.allowedParties;
+    const publicProjection = sql`
       SELECT cid, template_id, payload, status, owner_party, leaf_index, created_tx, consumed_tx, amount_micro
-      FROM notes
-      WHERE (${template ?? null}::int IS NULL OR template_id = ${template ?? null}::int)
-        AND (${party ?? null}::text IS NULL OR owner_party = ${party ?? null})
-      ORDER BY block_num DESC NULLS LAST
-      LIMIT 200`;
+      FROM notes`;
+    const rows =
+      parties === null
+        ? await sql`
+            ${publicProjection}
+            WHERE (${template ?? null}::int IS NULL OR template_id = ${template ?? null}::int)
+              AND (${party ?? null}::text IS NULL OR owner_party = ${party ?? null})
+            ORDER BY block_num DESC NULLS LAST
+            LIMIT 200`
+        : await sql`
+            ${publicProjection}
+            WHERE (${template ?? null}::int IS NULL OR template_id = ${template ?? null}::int)
+              AND (${party ?? null}::text IS NULL OR owner_party = ${party ?? null})
+              AND (owner_party IS NULL OR owner_party IN ${sql(parties.length ? parties : ["__no_party__"])})
+            ORDER BY block_num DESC NULLS LAST
+            LIMIT 200`;
     return c.json({ contracts: rows });
   });
 
   v1.get("/contracts/:cid", async (c) => {
-    const [row] = await sql`SELECT * FROM notes WHERE cid = ${c.req.param("cid")}`;
+    const user = c.get("user");
+    const [row] = await sql`
+      SELECT cid, template_id, payload, status, owner_party, leaf_index, created_tx, consumed_tx, amount_micro
+      FROM notes WHERE cid = ${c.req.param("cid")}`;
+    if (row?.owner_party) requireParty(user, row.owner_party);
     return row ? c.json(row) : c.json({ error: "not found" }, 404);
   });
 
@@ -302,6 +490,7 @@ export function buildApi(
     try {
       const user = requireRole(c, "admin", "trader");
       const { party, amountMicro } = await c.req.json();
+      requireParty(user, party);
       const result = await flows.shield(party, BigInt(amountMicro));
       await audit(sql, user.email, "shield", { party, amountMicro, ...result });
       return c.json(result);
@@ -314,6 +503,7 @@ export function buildApi(
     try {
       const user = requireRole(c, "admin", "trader");
       const { fromParty, toPartyOrEns, amountMicro } = await c.req.json();
+      requireParty(user, fromParty);
       const amount = BigInt(amountMicro);
 
       // four-eyes: over-limit actions become a pending approval instead of executing
@@ -371,7 +561,7 @@ export function buildApi(
     try {
       const approver = requireRole(c, "approver", "admin");
       const { approve, reason } = await c.req.json();
-      const [a] = await sql`SELECT a.*, w.state FROM approvals a JOIN workflows w ON w.id = a.workflow_id WHERE a.id = ${c.req.param("id")}`;
+      const [a] = await sql`SELECT a.*, w.kind AS workflow_kind, w.state AS workflow_state FROM approvals a JOIN workflows w ON w.id = a.workflow_id WHERE a.id = ${c.req.param("id")}`;
       if (!a) return c.json({ error: "not found" }, 404);
       if (a.status !== "pending") return c.json({ error: "already decided" }, 409);
       if (a.requested_by === approver.email && !approver.service)
@@ -385,11 +575,40 @@ export function buildApi(
         return c.json({ status: "rejected" });
       }
 
+      // Execute the approved workflow. Workflow kinds carry different state shapes, so
+      // branch on the kind — never assume a transfer (an over-limit repo lands here too).
+      let result: any;
+      if (a.workflow_kind === "repo") {
+        const p = (a.workflow_state as any).pending as {
+          dealerParty?: string; counterpartyEns: string; collateralCid: string;
+          cashAmountMicro: string; rateBps: number; days: number;
+        };
+        requireParty(approver, p.dealerParty ?? "trading");
+        result = await repo.propose(
+          p.dealerParty ?? "trading",
+          p.counterpartyEns,
+          p.collateralCid,
+          BigInt(p.cashAmountMicro),
+          BigInt(p.rateBps),
+          BigInt(p.days),
+          approver.email,
+        );
+      } else if (a.workflow_kind === "transfer") {
+        const params = a.workflow_state as { fromParty: string; toPartyOrEns: string; amountMicro: string };
+        requireParty(approver, params.fromParty);
+        result = await flows.transfer(params.fromParty, params.toPartyOrEns, BigInt(params.amountMicro));
+      } else if (a.workflow_kind === "strategy_deposit") {
+        const params = a.workflow_state as { amountMicro: string; fromParty?: string };
+        result = await executeStrategyDeposit(approver, params.amountMicro, params.fromParty);
+      } else if (a.workflow_kind === "strategy_withdraw") {
+        const params = a.workflow_state as { positionCid: string };
+        result = await executeStrategyWithdraw(approver, params.positionCid);
+      } else {
+        throw Object.assign(new Error(`unknown workflow kind ${a.workflow_kind}`), { status: 400 });
+      }
       await sql`UPDATE approvals SET status = 'approved', approver = ${approver.email}, reason = ${reason ?? null} WHERE id = ${a.id}`;
-      const params = a.state as { fromParty: string; toPartyOrEns: string; amountMicro: string };
-      const result = await flows.transfer(params.fromParty, params.toPartyOrEns, BigInt(params.amountMicro));
       await sql`UPDATE workflows SET status = 'executed', state = state || ${sql.json(result as any)} WHERE id = ${a.workflow_id}`;
-      await audit(sql, approver.email, "approval_approved_executed", { approvalId: a.id, ...result });
+      await audit(sql, approver.email, "approval_approved_executed", { approvalId: a.id, kind: a.workflow_kind, ...result });
       chain.emitExternal({ type: "approval_decided", approvalId: a.id, approved: true, ...result });
       return c.json({ status: "approved", ...result });
     } catch (e) {
@@ -401,6 +620,7 @@ export function buildApi(
     try {
       const user = requireRole(c, "admin", "trader");
       const { party, amountMicro, recipient } = await c.req.json();
+      requireParty(user, party);
       const result = await flows.unshield(party, BigInt(amountMicro), recipient);
       await audit(sql, user.email, "unshield", { party, amountMicro, recipient, ...result });
       return c.json(result);
@@ -414,6 +634,7 @@ export function buildApi(
     try {
       const user = requireRole(c, "admin", "trader");
       const { payerParty, payments } = await c.req.json();
+      requireParty(user, payerParty ?? "treasury");
       const result = await payroll.run(
         payerParty ?? "treasury",
         payments.map((p: any) => ({ employeeId: p.employeeId, amountMicro: BigInt(p.amountMicro) })),
@@ -440,8 +661,9 @@ export function buildApi(
 
   v1.post("/payroll/claim-data", async (c) => {
     try {
+      const user = requireRole(c, "employee");
       const { employeeId } = await c.req.json();
-      return c.json(await payroll.claimData(Number(employeeId)));
+      return c.json(await payroll.claimData(user.email, Number(employeeId)));
     } catch (e) {
       return onError(c, e);
     }
@@ -449,9 +671,10 @@ export function buildApi(
 
   v1.post("/payroll/claim", async (c) => {
     try {
+      const user = requireRole(c, "employee");
       const { employeeId } = await c.req.json();
-      const result = await payroll.claim(Number(employeeId));
-      await audit(sql, (c.get("user") as SessionUser).email, "payroll_claim", { employeeId, ...result });
+      const result = await payroll.claim(user.email, Number(employeeId));
+      await audit(sql, user.email, "payroll_claim", { employeeId, ...result });
       return c.json(result);
     } catch (e) {
       return onError(c, e);
@@ -460,9 +683,10 @@ export function buildApi(
 
   v1.post("/payroll/submit-claim", async (c) => {
     try {
+      const user = requireRole(c, "employee");
       const { proof, publicInputs } = await c.req.json();
-      const result = await payroll.submitClaim(proof, publicInputs);
-      await audit(sql, (c.get("user") as SessionUser).email, "payroll_submit_claim", result);
+      const result = await payroll.submitClaim(user.email, proof, publicInputs);
+      await audit(sql, user.email, "payroll_submit_claim", result);
       return c.json(result);
     } catch (e) {
       return onError(c, e);
@@ -479,6 +703,7 @@ export function buildApi(
     try {
       const user = requireRole(c, "admin", "trader");
       const { dealerParty, counterpartyEns, collateralCid, cashAmountMicro, rateBps, days } = await c.req.json();
+      requireParty(user, dealerParty ?? "trading");
       const amount = BigInt(cashAmountMicro);
       // four-eyes folds into the booking: over-limit repos route to an approver
       if (user.limitMicro !== null && amount > user.limitMicro) {
@@ -537,13 +762,20 @@ export function buildApi(
   // ── strategies (B2: Privy Earn, real chain) ───────────────────────────────────────
   v1.get("/strategies", async (c) => {
     try {
-      const status = await earn.status();
+      const [status, dep] = await Promise.all([
+        earn.status(),
+        sql`SELECT COALESCE(SUM(amount_micro), 0)::text AS total FROM notes WHERE status = 'active' AND template_id = 7`,
+      ]);
+      // Private principal currently deployed = sum of active StrategyPosition notes (template
+      // 7). Each is a ZK-redeemable claim on the Earn position, reconstructed from chain.
+      const deployedMicro = String(dep[0]?.total ?? "0");
       return c.json({
         earn: status,
+        deployedMicro,
         roadmap: {
           privateStrategies: {
-            title: "Private strategies",
-            blurb: "Shielded cash into Morpho/Aave/Uniswap with the position itself a private note.",
+            title: "Fully private strategies",
+            blurb: "Today the principal is a shielded note; next, the vault position itself becomes a note with its own nullifier (Morpho/Aave/Uniswap direct).",
             status: "roadmap",
           },
         },
@@ -556,10 +788,15 @@ export function buildApi(
   v1.post("/strategies/earn/deposit", async (c) => {
     try {
       const user = requireRole(c, "admin", "trader");
-      const { amountMicro } = await c.req.json();
-      const result = await earn.deposit(BigInt(amountMicro));
-      await audit(sql, user.email, "earn_deposit", { amountMicro });
-      return c.json(result);
+      const { amountMicro, fromParty } = await c.req.json();
+      requireParty(user, fromParty ?? "treasury");
+      const amount = BigInt(amountMicro);
+      if (user.limitMicro !== null && amount > user.limitMicro) {
+        const pending = await pendingApproval("strategy_deposit", { amountMicro, fromParty }, user.email, amountMicro);
+        await audit(sql, user.email, "strategy_deposit_pending_approval", pending);
+        return c.json(pending, 202);
+      }
+      return c.json(await executeStrategyDeposit(user, amountMicro, fromParty));
     } catch (e) {
       return onError(c, e);
     }
@@ -568,10 +805,19 @@ export function buildApi(
   v1.post("/strategies/earn/withdraw", async (c) => {
     try {
       const user = requireRole(c, "admin", "trader");
-      const { amountMicro } = await c.req.json();
-      const result = await earn.withdraw(BigInt(amountMicro));
-      await audit(sql, user.email, "earn_withdraw", { amountMicro });
-      return c.json(result);
+      const { positionCid } = await c.req.json();
+      const [pos] = await sql`
+        SELECT owner_party, amount_micro FROM notes
+        WHERE cid = ${positionCid} AND template_id = 7 AND status = 'active'`;
+      if (!pos) return c.json({ error: "no active strategy position with that id" }, 404);
+      requireParty(user, pos.owner_party);
+      const amount = BigInt(pos.amount_micro);
+      if (user.limitMicro !== null && amount > user.limitMicro) {
+        const pending = await pendingApproval("strategy_withdraw", { positionCid }, user.email, amount.toString());
+        await audit(sql, user.email, "strategy_withdraw_pending_approval", pending);
+        return c.json(pending, 202);
+      }
+      return c.json(await executeStrategyWithdraw(user, positionCid));
     } catch (e) {
       return onError(c, e);
     }

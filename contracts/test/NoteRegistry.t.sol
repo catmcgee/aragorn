@@ -38,7 +38,7 @@ contract NoteRegistryTest is Test {
         registry = new NoteRegistry(IPoseidon2(address(poseidon)), vault);
         vault.setRegistry(address(registry));
         mock = new MockVerifier();
-        for (uint32 i = 1; i <= 8; i++) registry.setVerifier(i, mock);
+        for (uint32 i = 1; i <= 10; i++) registry.setVerifier(i, mock);
     }
 
     function pi(bytes32 root, uint256 t, bytes32 n1, bytes32 c1, uint256 aux1, uint256 aux2)
@@ -88,10 +88,13 @@ contract NoteRegistryTest is Test {
         usdc.mint(alice, 10e6);
         vm.prank(alice);
         usdc.approve(address(vault), 10e6);
+        vm.prank(alice);
+        vault.depositFor(bytes32(uint256(7)), 10e6);
 
-        registry.settle(1, "", pi(EMPTY_ROOT, 0, bytes32(0), bytes32(uint256(7)), 10e6, uint256(uint160(alice))), new bytes[](0));
+        registry.settle(1, "", pi(EMPTY_ROOT, 0, bytes32(0), bytes32(uint256(7)), 10e6, 0), new bytes[](0));
         assertEq(usdc.balanceOf(address(vault)), 10e6, "vault holds shielded USDC");
         assertEq(usdc.balanceOf(alice), 0);
+        assertEq(vault.pendingShield(bytes32(uint256(7))), 0);
 
         registry.settle(
             3, "", pi(registry.root(), 0, bytes32(uint256(9)), bytes32(uint256(8)), 4e6, uint256(uint160(alice))), new bytes[](0)
@@ -120,5 +123,7 @@ contract NoteRegistryTest is Test {
     function test_vault_only_registry() public {
         vm.expectRevert("vault: not registry");
         vault.onUnshield(alice, 1);
+        vm.expectRevert("vault: not registry");
+        vault.onShield(bytes32(uint256(1)), 1);
     }
 }

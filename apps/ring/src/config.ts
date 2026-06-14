@@ -31,7 +31,7 @@ export interface RingConfig {
   biscuitRootPriv?: string;
   emailDomainAllowlist: string[];
   sepoliaRpcUrl?: string;
-  /** the Ring's OWN ENS name — its on-chain identity (ENS v2 proposal #3) */
+  /** the Ring's OWN ENS name — its onchain identity (ENS v2 proposal #3) */
   ringEns?: string;
   enabledModules: string[];
 }

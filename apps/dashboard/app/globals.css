@@ -231,6 +231,27 @@ table {
   border-bottom: 1px dotted rgb(176 136 51 / 0.6);
   padding-bottom: 0.5px;
 }
+/* Portaled glossary tooltip — fixed to the viewport (escapes scroll/overflow clipping)
+   and clamped horizontally so it can't slip behind the sidebar. */
+.term-tip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 200;
+  width: max-content;
+  max-width: 17rem;
+  padding: 7px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-ink);
+  box-shadow: 0 12px 30px rgb(20 30 45 / 0.18);
+  color: #f3f6f8;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.5;
+  text-transform: none;
+  white-space: normal;
+  pointer-events: none;
+}
 
 /* ── Ring animations (gold = ring-as-story) ─────────────────────────────────── */
 @keyframes ring-orbit {

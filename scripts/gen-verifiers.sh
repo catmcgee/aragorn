@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 mkdir -p contracts/src/verifiers
 
-CIRCUITS=${CIRCUITS:-"cash_shield cash_transfer cash_unshield cash_fanout entitlement_claim repo_propose_allocate repo_accept repo_close"}
+CIRCUITS=${CIRCUITS:-"cash_shield cash_transfer cash_unshield cash_fanout entitlement_claim repo_propose_allocate repo_accept repo_close strategy_open strategy_redeem"}
 
 pascal() { echo "$1" | awk -F_ '{for (i=1;i<=NF;i++) printf "%s%s", toupper(substr($i,1,1)), substr($i,2)}'; }
 

@@ -142,7 +142,7 @@ contract NoteRegistry {
 
         // vault side effects: aux1 = publicInputs[10], aux2 = publicInputs[11]
         if (circuitId == CIRCUIT_CASH_SHIELD) {
-            vault.onShield(address(uint160(uint256(publicInputs[11]))), uint256(publicInputs[10]));
+            vault.onShield(publicInputs[6], uint256(publicInputs[10]));
         } else if (circuitId == CIRCUIT_CASH_UNSHIELD) {
             vault.onUnshield(address(uint160(uint256(publicInputs[11]))), uint256(publicInputs[10]));
         }

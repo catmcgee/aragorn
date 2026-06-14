@@ -1,6 +1,6 @@
 // CCIP-Read gateway (ERC-3668 + ENSIP-10, BUILD_SPEC §6.5): serves SIGNED resolution
 // responses for employee subnames (e.g. cat.ubs.aragorn-rings.eth) from the employees table.
-// The on-chain OffchainResolver pins this gateway's signer pubkey, so even a hosted gateway
+// The onchain OffchainResolver pins this gateway's signer pubkey, so even a hosted gateway
 // cannot forge records. Employee labels are capabilities, not a directory (PLAN §11).
 import { Hono } from "hono";
 import {

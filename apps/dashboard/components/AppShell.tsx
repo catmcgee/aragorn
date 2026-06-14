@@ -240,12 +240,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {me.user.role}
             </span>
           </button>
-          <button
-            className="border-t border-line-soft px-3.5 py-2 text-left text-[11px] text-ink-5 hover:text-ink-3"
-            onClick={logout}
-          >
-            Sign out
-          </button>
         </nav>
 
         {/* ── Main + public panel ─────────────────────────────────────────── */}
@@ -292,40 +286,63 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </main>
 
-        {/* ── Wallet popover ──────────────────────────────────────────────── */}
+        {/* ── Account modal (centered) ────────────────────────────────────── */}
         {walletOpen && (
-          <>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="fixed inset-0 z-40"
+              className="absolute inset-0 bg-ink/25 backdrop-blur-[1.5px]"
               onClick={() => setWalletOpen(false)}
               aria-hidden
             />
             <div
               role="dialog"
-              aria-label="Wallet"
-              className="fixed bottom-14 left-3 z-50 w-[220px] rounded-xl border border-line bg-paper p-3.5 shadow-[0_8px_28px_rgb(20_30_45/0.16)]"
+              aria-label="Account"
+              aria-modal="true"
+              className="relative z-10 w-full max-w-md rounded-2xl border border-line bg-paper p-5 shadow-[0_18px_60px_rgb(20_30_45/0.24)]"
             >
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-[11px] font-medium tracking-[0.06em] text-ink-3 uppercase">
-                  Wallet
+              {/* identity header */}
+              <div className="flex items-start gap-3 border-b border-line-soft pb-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-ground-3 text-[13px] text-ink-3">
+                  {initials(me.user.email)}
+                </div>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-[14px] font-medium text-ink">
+                    {me.user.email.split("@")[0]}
+                  </div>
+                  <div className="truncate text-[11.5px] text-ink-5">{me.user.email}</div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-6">
+                    <span className="truncate">{me.ens ?? me.org}</span>
+                    <span className="rounded border border-steel/40 px-1 py-px tracking-[0.06em] text-steel uppercase">
+                      {me.user.role}
+                    </span>
+                  </div>
                 </div>
                 <button
-                  className="flex h-5 w-5 items-center justify-center rounded text-ink-6 hover:text-ink"
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-6 hover:text-ink"
                   onClick={() => setWalletOpen(false)}
-                  aria-label="Close wallet"
+                  aria-label="Close account"
                 >
                   ×
                 </button>
               </div>
-              {privyConfigured ? (
-                <WalletPopover onClose={() => setWalletOpen(false)} />
-              ) : (
-                <p className="text-[12px] text-ink-5">
-                  Signed in with a service token — no embedded wallet
-                </p>
-              )}
+
+              {/* wallet + balances */}
+              <div className="py-4">
+                {privyConfigured ? (
+                  <WalletPopover onClose={() => setWalletOpen(false)} />
+                ) : (
+                  <p className="text-[12px] text-ink-5">
+                    Signed in with a service token — no embedded wallet
+                  </p>
+                )}
+              </div>
+
+              {/* sign out lives inside the account panel */}
+              <button className="btn w-full border-t border-line-soft" onClick={logout}>
+                Sign out
+              </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </RingContext.Provider>

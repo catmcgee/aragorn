@@ -1,6 +1,6 @@
 // Identity & control plane (BUILD_SPEC §6.2, PLAN §5.1).
 // Humans: Privy JWT → short-lived session Biscuit. Services: admin-minted Biscuits.
-// ONE policy path: every mutating route checks Biscuit facts (role, act_as, limit).
+// ONE policy path: every mutating route checks Biscuit facts (role, limit).
 import {
   KeyPair,
   PrivateKey,
@@ -19,8 +19,8 @@ export type Role = "admin" | "trader" | "approver" | "viewer" | "auditor" | "emp
 export interface SessionUser {
   email: string;
   role: Role;
-  actAs: string[];
   limitMicro: bigint | null; // null = unlimited
+  allowedParties: string[] | null; // null = all parties (admin/service)
   service?: boolean;
 }
 
@@ -92,8 +92,8 @@ export class AuthService {
     const user: SessionUser = {
       email: row.email,
       role: row.role,
-      actAs: row.act_as ?? [],
       limitMicro: row.notional_limit_micro === null ? null : BigInt(row.notional_limit_micro),
+      allowedParties: row.allowed_parties ?? null,
     };
     return { biscuit: this.mint(user, 3600), user };
   }
@@ -107,8 +107,8 @@ export class AuthService {
       limit(${user.limitMicro === null ? -1 : Number(user.limitMicro)});
       check if time($t), $t < ${expiry};
     `;
-    for (const p of user.actAs) builder.addFact(fact`act_as(${p})`);
     if (user.service) builder.addFact(fact`service(true)`);
+    for (const party of user.allowedParties ?? []) builder.addFact(fact`party(${party})`);
     return builder.build(this.root.getPrivateKey()).toBase64();
   }
 
@@ -122,13 +122,15 @@ export class AuthService {
     const emails = q(rule`q($u) <- user($u)`);
     const roles = q(rule`q($r) <- role($r)`);
     const limits = q(rule`q($l) <- limit($l)`);
-    const actAs = q(rule`q($p) <- act_as($p)`);
+    const parties = q(rule`q($p) <- party($p)`).map(String);
+    const service = q(rule`q($s) <- service($s)`).length > 0;
     const limit = Number(limits[0] ?? -1);
     return {
       email: String(emails[0] ?? "service"),
       role: (roles[0] ?? "viewer") as Role,
-      actAs: actAs.map(String),
       limitMicro: limit < 0 ? null : BigInt(limit),
+      allowedParties: parties.length ? parties : null,
+      service,
     };
   }
 }

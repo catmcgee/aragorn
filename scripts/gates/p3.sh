@@ -83,9 +83,9 @@ jqget() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d$1)"; }
 
 echo "── invite users (admin): jane=trader(\$20 limit), marcus=approver"
 eval curl -X POST $UBS/users/invite -H "'content-type: application/json'" \
-  -d "'{\"email\":\"jane@ubs-demo.com\",\"role\":\"trader\",\"actAs\":[\"treasury\"],\"limitMicro\":\"20000000\"}'" | jqget "['user']['email']"
+  -d "'{\"email\":\"jane@ubs-demo.com\",\"role\":\"trader\",\"allowedParties\":[\"treasury\"],\"limitMicro\":\"20000000\"}'" | jqget "['user']['email']"
 eval curl -X POST $UBS/users/invite -H "'content-type: application/json'" \
-  -d "'{\"email\":\"marcus@ubs-demo.com\",\"role\":\"approver\",\"actAs\":[]}'" | jqget "['user']['email']"
+  -d "'{\"email\":\"marcus@ubs-demo.com\",\"role\":\"approver\"}'" | jqget "['user']['email']"
 
 echo "── Privy → Biscuit exchange"
 PRIVY_OUT=$(bun scripts/p3-privy-exchange.ts 2>&1) || { echo "$PRIVY_OUT" | tail -10; exit 1; }
@@ -93,9 +93,9 @@ echo "   $(echo "$PRIVY_OUT" | tail -1)"
 
 echo "── biscuit session tokens (jane: trader w/ \$20 limit, marcus: approver)"
 JANE=$(eval curl -X POST $UBS/service-tokens -H "'content-type: application/json'" \
-  -d "'{\"role\":\"trader\",\"actAs\":[\"treasury\"],\"maxNotionalMicro\":\"20000000\"}'" | jqget "['biscuit']")
+  -d "'{\"role\":\"trader\",\"allowedParties\":[\"treasury\"],\"maxNotionalMicro\":\"20000000\"}'" | jqget "['biscuit']")
 MARCUS=$(eval curl -X POST $UBS/service-tokens -H "'content-type: application/json'" \
-  -d "'{\"role\":\"approver\",\"actAs\":[]}'" | jqget "['biscuit']")
+  -d "'{\"role\":\"approver\"}'" | jqget "['biscuit']")
 JANE_ME=$(curl -s -H "authorization: Bearer $JANE" http://127.0.0.1:4001/v1/me | jqget "['user']['role']")
 [ "$JANE_ME" = "trader" ] || { echo "biscuit verify failed"; exit 1; }
 echo "   jane session verified as trader ✓"

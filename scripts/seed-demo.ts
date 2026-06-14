@@ -1,6 +1,6 @@
 // Demo seed (BUILD_SPEC §10) — everything via the public API (API-first invariant):
 // users/roles, whitelists, shields, payroll history (run + one claim), one completed
-// four-eyes internal transfer. The bond is seeded on-chain by seed-bond.ts beforehand.
+// four-eyes internal transfer. The bond is seeded onchain by seed-bond.ts beforehand.
 import { RingClient } from "../packages/sdk/src/index.ts";
 
 const UBS = new RingClient("http://127.0.0.1:4001", "ubs-api-token");
@@ -13,14 +13,14 @@ const step = (s: string) => console.log(`   ${s}`);
 step("users: JPM {admin, jane=trader($1M limit), marcus=approver, auditor} + GS {admin, trader}");
 // the founder/operator identity — signs in with their real work email via Privy,
 // admin on both Rings so they can drive either side of the demo.
-await UBS.inviteUser("helloworld@mcgee.cat", "admin", ["treasury", "trading"]);
-await DRW.inviteUser("helloworld@mcgee.cat", "admin", ["desk"]);
-await UBS.inviteUser("admin@jpmorgan-demo.com", "admin", ["treasury", "trading"]);
-await UBS.inviteUser("jane@jpmorgan-demo.com", "trader", ["treasury", "trading"], $(1_000_000));
-await UBS.inviteUser("marcus@jpmorgan-demo.com", "approver", []);
-await UBS.inviteUser("auditor@jpmorgan-demo.com", "auditor", []);
-await DRW.inviteUser("admin@goldman-demo.com", "admin", ["desk"]);
-await DRW.inviteUser("trader@goldman-demo.com", "trader", ["desk"], $(10_000_000));
+await UBS.inviteUser("helloworld@mcgee.cat", "admin");
+await DRW.inviteUser("helloworld@mcgee.cat", "admin");
+await UBS.inviteUser("admin@jpmorgan-demo.com", "admin");
+await UBS.inviteUser("jane@jpmorgan-demo.com", "trader", $(1_000_000));
+await UBS.inviteUser("marcus@jpmorgan-demo.com", "approver");
+await UBS.inviteUser("auditor@jpmorgan-demo.com", "auditor");
+await DRW.inviteUser("admin@goldman-demo.com", "admin");
+await DRW.inviteUser("trader@goldman-demo.com", "trader", $(10_000_000));
 
 // 2. counterparty whitelists via live Sepolia ENS (§10.8 idempotent)
 step("whitelists: live ENSv2 resolution both directions");
@@ -71,10 +71,9 @@ await raw("ubs", "POST", "/v1/payroll/claim", { employeeId: employees[0].id });
 step("four-eyes history: jane books $2M treasury→trading, marcus approves (proving…)");
 const jane = (await raw("ubs", "POST", "/v1/service-tokens", {
   role: "trader",
-  actAs: ["treasury"],
   maxNotionalMicro: $(1_000_000).toString(),
 })).biscuit as string;
-const marcus = (await raw("ubs", "POST", "/v1/service-tokens", { role: "approver", actAs: [] }))
+const marcus = (await raw("ubs", "POST", "/v1/service-tokens", { role: "approver" }))
   .biscuit as string;
 const pending = await fetch("http://127.0.0.1:4001/v1/transfers", {
   method: "POST",

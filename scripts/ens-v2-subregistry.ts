@@ -1,5 +1,5 @@
 // ENS v2 proposal #1 — a Ring OWNS its name's subregistry; departments are real
-// on-chain ERC-1155 subname tokens (not wildcard text records).
+// onchain ERC-1155 subname tokens (not wildcard text records).
 //
 // Verified recipe (gskril/ens-cli + ensdomains/contracts-v2):
 //   subregistryImplementation 0x0F99… = UserRegistry (UUPS PermissionedRegistry).
@@ -77,7 +77,7 @@ const RESOLVER_ROLE_BITMAP = 0x0000000000000000000000000000001100000000000000000
 
 // dedicated, demo-safe 2LD candidates (NOT aragornrings.eth)
 const CANDIDATE_LABELS = ["aragorn-sovereign", "aragorn-subreg", "aragorn-rings-org"];
-// departments minted as on-chain tokens under the institution's 2LD, with their settlement party x
+// departments minted as onchain tokens under the institution's 2LD, with their settlement party x
 const DEPARTMENTS: Record<string, { partyX: string; desk: string }> = {
   treasury: { partyX: "0x17e0796c17481a34e6aa53421dce80dd2e7b2a1d49a48e49880faa8e7dcc97a4", desk: "Treasury" },
   trading: { partyX: "0x0e6888df5c6acfaea4c9e2d31ffd717268abc22f9cba99efe0300295b3ae6e3a", desk: "Trading Desk" },
@@ -261,7 +261,7 @@ if (attached.toLowerCase() !== childRegistry.toLowerCase()) {
   );
 }
 
-// 4. mint each department as an on-chain subname token + write its party key record
+// 4. mint each department as an onchain subname token + write its party key record
 const expiry = BigInt(Math.floor(Date.now() / 1000)) + DURATION;
 for (const [dept, { partyX, desk }] of Object.entries(DEPARTMENTS)) {
   const st = await pub.readContract({ address: childRegistry, abi: childRegistryAbi, functionName: "getState", args: [labelId(dept)] }).catch(() => null);
@@ -281,7 +281,7 @@ for (const [dept, { partyX, desk }] of Object.entries(DEPARTMENTS)) {
   }
 }
 
-// 5. verify the on-chain subname tokens resolve through UniversalResolverV2
+// 5. verify the onchain subname tokens resolve through UniversalResolverV2
 console.log("── verifying department subnames via UniversalResolver");
 let ok = true;
 for (const [dept, { partyX }] of Object.entries(DEPARTMENTS)) {
@@ -294,6 +294,6 @@ if (!ok) throw new Error("UniversalResolver verification failed — subregistry 
 
 save();
 console.log(`\n✅ ENS v2 #1 done: ${name} owns subregistry ${childRegistry}`);
-console.log(`   departments minted as on-chain tokens: ${Object.keys(DEPARTMENTS).map((d) => `${d}.${name}`).join(", ")}`);
+console.log(`   departments minted as onchain tokens: ${Object.keys(DEPARTMENTS).map((d) => `${d}.${name}`).join(", ")}`);
 console.log(`   tx hashes:`);
 for (const [what, hash] of Object.entries(txHashes)) console.log(`     ${what}: ${hash}`);

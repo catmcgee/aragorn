@@ -46,6 +46,11 @@ const usdc = getContract({
   ]),
   client: { public: pub, wallet },
 });
+const vault = getContract({
+  address: deployments.vault,
+  abi: parseAbi(["function depositFor(bytes32 commitment, uint256 amount)"]),
+  client: { public: pub, wallet },
+});
 const registry = getContract({
   address: deployments.registry,
   abi: NOTE_REGISTRY_ABI,
@@ -115,18 +120,22 @@ const shieldNote = newNote(
     t: 0n,
     nullifiers: [],
     commitments: [c],
-    aux: [$(10n), addressToField(account.address)],
+    aux: [$(10n), 0n],
+  });
+  await pub.waitForTransactionReceipt({
+    hash: await vault.write.depositFor([fieldToHex(c), $(10n)]),
   });
   const bundle = await prove("cash_shield", artifact("cash_shield"), {
     root: fieldToHex(tree.root),
     t_bound: "0",
     nullifiers: ["0", "0", "0", "0"],
     commitments: [fieldToHex(c), "0", "0", "0"],
-    aux: [fieldToHex($(10n)), fieldToHex(addressToField(account.address)), "0", "0"],
+    aux: [fieldToHex($(10n)), "0", "0", "0"],
     owner_x: fieldToHex(ubsTreasury.x),
     amount: $(10n).toString(),
     salt: fieldToHex(shieldNote.salt),
     salt2: fieldToHex(shieldNote.fields.salt2),
+    note_secret: fieldToHex(shieldNote.noteSecret),
   });
   // sanity: prover's public inputs must equal the settle layout we computed
   if (bundle.publicInputs.join() !== pi.join())
@@ -136,7 +145,7 @@ const shieldNote = newNote(
   );
   await settle(CircuitId.cash_shield, bundle, cts);
   tree.insert(c);
-  assertEq(await registry.read.root(), fieldToHex(tree.root), "on-chain root == mirror root");
+  assertEq(await registry.read.root(), fieldToHex(tree.root), "onchain root == mirror root");
   assertEq(await usdc.read.balanceOf([deployments.vault]), $(10n), "vault custody");
 }
 
@@ -185,9 +194,11 @@ const changeNote = newNote(
     out1_amount: $(6n).toString(),
     out1_salt: fieldToHex(drwNote.salt),
     out1_salt2: fieldToHex(drwNote.fields.salt2),
+    out1_secret: fieldToHex(drwNote.noteSecret),
     change_amount: $(4n).toString(),
     change_salt: fieldToHex(changeNote.salt),
     change_salt2: fieldToHex(changeNote.fields.salt2),
+    change_secret: fieldToHex(changeNote.noteSecret),
   });
   // ciphertexts: recipient note → DRW org key; change → UBS org key
   const cts = [
@@ -218,7 +229,7 @@ const recipient = "0x00000000000000000000000000000000deadbeef" as const;
   const drwChange = newNote(TemplateId.Cash, { owner_x: drwDesk.x, amount: change, salt2: 0n }, [drwDesk.x]);
   const c1 = commitment(drwChange);
   const root = tree.root;
-  const sig = signField(drwDesk, transitionMessage(root, [n1], [c1]));
+  const sig = signField(drwDesk, transitionMessage(root, [n1], [c1], [unshieldAmount, addressToField(recipient)]));
 
   const bundle = await prove("cash_unshield", artifact("cash_unshield"), {
     root: fieldToHex(root),
@@ -239,6 +250,7 @@ const recipient = "0x00000000000000000000000000000000deadbeef" as const;
     change_amount: change.toString(),
     change_salt: fieldToHex(drwChange.salt),
     change_salt2: fieldToHex(drwChange.fields.salt2),
+    change_secret: fieldToHex(drwChange.noteSecret),
   });
   const cts = encryptNoteFor([drwEnc.publicKey], drwChange).map(
     (u) => `0x${Buffer.from(u).toString("hex")}` as `0x${string}`,

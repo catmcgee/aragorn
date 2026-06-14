@@ -1,5 +1,5 @@
 // Sync engine (BUILD_SPEC §6.3): tail Settled/LeafInserted events, view-tag scan, decrypt,
-// upsert projection. The in-memory tree mirrors the on-chain incremental tree exactly.
+// upsert projection. The in-memory tree mirrors the onchain incremental tree exactly.
 import {
   createPublicClient,
   createWalletClient,
@@ -71,7 +71,7 @@ export class ChainSync {
     for (const fn of this.listeners) fn(e);
   }
 
-  /** For non-chain events that belong on the same SSE stream (approvals, workflows). */
+  /** For nonchain events that belong on the same SSE stream (approvals, workflows). */
   emitExternal(e: RingEvent): void {
     this.emit(e);
   }

@@ -3,7 +3,7 @@
 #   - coordinator: bun apps/coordinator/src/index.ts
 #   - ring:        node --experimental-wasm-modules … apps/ring/src/index.ts  (biscuit-wasm needs Node, not bun)
 # Settlement reuses the existing Sepolia deployment (addresses passed via env), so no
-# deployments.sepolia.json / on-chain deploy is needed at runtime.
+# deployments.sepolia.json / onchain deploy is needed at runtime.
 FROM node:22-slim
 
 # bun for install (workspaces) + tiny utils

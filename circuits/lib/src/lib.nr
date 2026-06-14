@@ -11,6 +11,7 @@ pub global TEMPLATE_REPO_PROPOSAL: Field = 3;
 pub global TEMPLATE_COLLATERAL_ALLOCATION: Field = 4;
 pub global TEMPLATE_REPO_AGREEMENT: Field = 5;
 pub global TEMPLATE_ENTITLEMENT: Field = 6;
+pub global TEMPLATE_STRATEGY_POSITION: Field = 7;
 
 pub global TREE_DEPTH: u32 = 32;
 
@@ -20,8 +21,12 @@ pub fn stakeholders_hash(xs: [Field; 4]) -> Field {
     Poseidon2::hash(xs, 4)
 }
 
-pub fn commitment(template_id: Field, payload_hash: Field, stakeholders: Field, salt: Field) -> Field {
-    Poseidon2::hash([template_id, VERSION, payload_hash, stakeholders, salt], 5)
+pub fn nullifier_key_hash(note_secret: Field) -> Field {
+    Poseidon2::hash([note_secret], 1)
+}
+
+pub fn commitment(template_id: Field, payload_hash: Field, stakeholders: Field, note_secret: Field, salt: Field) -> Field {
+    Poseidon2::hash([template_id, VERSION, payload_hash, stakeholders, nullifier_key_hash(note_secret), salt], 6)
 }
 
 pub fn nullifier(c: Field, note_secret: Field) -> Field {
@@ -34,11 +39,35 @@ pub fn cash_payload(owner_x: Field, amount: u64, salt2: Field) -> Field {
 }
 
 /// Single-stakeholder Cash commitment.
-pub fn cash_commitment(owner_x: Field, amount: u64, salt2: Field, salt: Field) -> Field {
+pub fn cash_commitment(owner_x: Field, amount: u64, salt2: Field, note_secret: Field, salt: Field) -> Field {
     commitment(
         TEMPLATE_CASH,
         cash_payload(owner_x, amount, salt2),
         stakeholders_hash([owner_x, 0, 0, 0]),
+        note_secret,
+        salt,
+    )
+}
+
+/// StrategyPosition payload (S3.6): [owner_x, vault_id_hash, amount, open_ts]
+pub fn strategy_payload(owner_x: Field, vault_id_hash: Field, amount: u64, open_ts: Field) -> Field {
+    Poseidon2::hash([owner_x, vault_id_hash, amount as Field, open_ts], 4)
+}
+
+/// Single-stakeholder StrategyPosition commitment (private yield-strategy principal claim).
+pub fn strategy_commitment(
+    owner_x: Field,
+    vault_id_hash: Field,
+    amount: u64,
+    open_ts: Field,
+    note_secret: Field,
+    salt: Field,
+) -> Field {
+    commitment(
+        TEMPLATE_STRATEGY_POSITION,
+        strategy_payload(owner_x, vault_id_hash, amount, open_ts),
+        stakeholders_hash([owner_x, 0, 0, 0]),
+        note_secret,
         salt,
     )
 }
@@ -80,6 +109,10 @@ pub fn transition_msg_2x2(root: Field, n1: Field, n2: Field, c1: Field, c2: Fiel
 
 pub fn transition_msg_1x1(root: Field, n1: Field, c1: Field) -> Field {
     Poseidon2::hash([root, n1, c1], 3)
+}
+
+pub fn transition_msg_1x1_aux2(root: Field, n1: Field, c1: Field, a1: Field, a2: Field) -> Field {
+    Poseidon2::hash([root, n1, c1, a1, a2], 5)
 }
 
 // -- P4 template payloads (S3.6 field orders) ------------------------------------
@@ -164,4 +197,15 @@ pub fn transition_msg_4x4(root: Field, n: [Field; 4], c: [Field; 4]) -> Field {
 
 pub fn transition_msg_4x3(root: Field, n: [Field; 4], c1: Field, c2: Field, c3: Field) -> Field {
     Poseidon2::hash([root, n[0], n[1], n[2], n[3], c1, c2, c3], 8)
+}
+
+#[test]
+fn test_strategy_commitment_matches_protocol() {
+    // Cross-language check: the value below is computed by packages/protocol commitment()
+    // for a StrategyPosition note {owner_x:1, vault_id_hash:2, amount:1000, open_ts:3, note_secret:4, salt:5}.
+    // If this assert fails, the TS and Noir commitment encodings have diverged.
+    assert(
+        strategy_commitment(1, 2, 1000, 3, 4, 5)
+            == 0x195bd4c7b6e324ca06a236719475af550c9a0f165ef00edaa33a9f7474912f10,
+    );
 }

@@ -13,6 +13,7 @@ fn main(
     amount: u64,
     salt: Field,
     salt2: Field,
+    note_secret: Field,
 ) {
     // No consumed notes; root is contract-checked only.
     let _ = root;
@@ -27,7 +28,7 @@ fn main(
     assert(aux[2] == 0);
     assert(aux[3] == 0);
 
-    let c = cash_commitment(owner_x, amount, salt2, salt);
+    let c = cash_commitment(owner_x, amount, salt2, note_secret, salt);
     assert(commitments[0] == c);
     assert(commitments[1] == 0);
     assert(commitments[2] == 0);
@@ -38,7 +39,7 @@ fn main(
 fn shield_happy() {
     let owner_x = 77;
     let amount: u64 = 5_000_000;
-    let c = cash_commitment(owner_x, amount, 11, 22);
+    let c = cash_commitment(owner_x, amount, 11, 33, 22);
     main(
         0,
         0,
@@ -49,11 +50,12 @@ fn shield_happy() {
         amount,
         22,
         11,
+        33,
     );
 }
 
 #[test(should_fail)]
 fn shield_wrong_amount() {
-    let c = cash_commitment(77, 5_000_000, 11, 22);
-    main(0, 0, [0, 0, 0, 0], [c, 0, 0, 0], [999 as Field, 0xabcd, 0, 0], 77, 5_000_000, 22, 11);
+    let c = cash_commitment(77, 5_000_000, 11, 33, 22);
+    main(0, 0, [0, 0, 0, 0], [c, 0, 0, 0], [999 as Field, 0xabcd, 0, 0], 77, 5_000_000, 22, 11, 33);
 }

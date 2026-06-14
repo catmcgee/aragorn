@@ -3,8 +3,9 @@
 // and CI drives full flows through this client alone (API-first invariant).
 
 export interface Me {
-  user: { email: string; role: string; actAs: string[] };
+  user: { email: string; role: string };
   limitMicro: string | null;
+  allowedParties: string[] | null;
   org: string;
   ens: string | null;
   enabledModules: string[];
@@ -218,11 +219,10 @@ export class RingClient {
   }
 
   // admin
-  inviteUser(email: string, role: string, actAs: string[], limitMicro?: bigint) {
+  inviteUser(email: string, role: string, limitMicro?: bigint) {
     return this.req<{ user: unknown }>("POST", "/v1/users/invite", {
       email,
       role,
-      actAs,
       limitMicro: limitMicro?.toString(),
     });
   }
@@ -239,11 +239,11 @@ export class RingClient {
       { ensName },
     );
   }
-  serviceToken(actAs: string[], maxNotionalMicro?: bigint, ttlSeconds?: number) {
+  serviceToken(maxNotionalMicro?: bigint, ttlSeconds?: number, role?: string) {
     return this.req<{ biscuit: string }>("POST", "/v1/service-tokens", {
-      actAs,
       maxNotionalMicro: maxNotionalMicro?.toString(),
       ttlSeconds,
+      role,
     });
   }
   auditExport() {

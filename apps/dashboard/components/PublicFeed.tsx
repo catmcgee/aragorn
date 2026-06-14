@@ -60,7 +60,7 @@ export default function PublicFeed({ ringUrl }: { ringUrl: string }) {
               <GrayRing size={16} />
               <span className="text-xs text-ink-4">{e.type ?? "settlement"}</span>
               <span className="chip">circuit #{String(e.circuit ?? e.circuitId ?? "?")}</span>
-              <HashChip value={tx} />
+              <HashChip value={tx} kind="tx" />
               <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-pos">
                 <svg width="11" height="11" viewBox="0 0 16 16">
                   <path

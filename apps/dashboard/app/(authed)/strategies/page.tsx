@@ -8,7 +8,15 @@ import { useEffect, useState } from "react";
 import { cleanError } from "@aragorn/sdk";
 import { useRing, getStoredToken } from "@/lib/ring";
 import { fmtMicro, usdcToMicro } from "@/lib/format";
+import { HashChip } from "@/components/chips";
 import RoadmapBox from "@/components/RoadmapBox";
+
+interface StrategyPositionRow {
+  cid: string;
+  amount_micro: string | null;
+  status: string;
+  created_tx: string | null;
+}
 
 interface Strategies {
   earn: {
@@ -20,6 +28,8 @@ interface Strategies {
     };
     vault?: { apyBps: number; provider: string; tvlUsd: number };
   };
+  // Shielded principal currently deployed to the strategy (the private UTXO backing Earn).
+  deployedMicro?: string;
   roadmap: {
     privateStrategies: { title: string; blurb: string; status: string };
   };
@@ -53,35 +63,71 @@ export default function StrategiesPage() {
   const [refresh, setRefresh] = useState(0);
 
   const [depositAmount, setDepositAmount] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [busy, setBusy] = useState<"deposit" | "withdraw" | null>(null);
+  const [desk, setDesk] = useState("treasury");
+  const [positions, setPositions] = useState<StrategyPositionRow[]>([]);
+  // "deposit" while depositing, or a position cid while that position is being redeemed.
+  const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    authedFetch(ringUrl, "/v1/strategies")
-      .then((r) => live && setData(r as unknown as Strategies))
+    Promise.all([
+      authedFetch(ringUrl, "/v1/strategies"),
+      authedFetch(ringUrl, "/v1/contracts?template=7"),
+    ])
+      .then(([s, p]) => {
+        if (!live) return;
+        setData(s as unknown as Strategies);
+        const rows = ((p.contracts as StrategyPositionRow[]) ?? []).filter((r) => r.status === "active");
+        setPositions(rows);
+      })
       .catch((e) => live && setError(cleanError(e)));
     return () => {
       live = false;
     };
   }, [ringUrl, tick, refresh]);
 
-  async function earnAction(kind: "deposit" | "withdraw", e: React.FormEvent) {
+  async function deposit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setNotice(null);
-    setBusy(kind);
+    setBusy("deposit");
     try {
-      const amount = kind === "deposit" ? depositAmount : withdrawAmount;
-      await authedFetch(ringUrl, `/v1/strategies/earn/${kind}`, {
-        amountMicro: usdcToMicro(amount).toString(),
+      const res = await authedFetch(ringUrl, "/v1/strategies/earn/deposit", {
+        amountMicro: usdcToMicro(depositAmount).toString(),
+        fromParty: desk,
       });
-      setNotice(
-        `${kind === "deposit" ? "Deposit" : "Withdrawal"} submitted — settling on Base`,
-      );
-      if (kind === "deposit") setDepositAmount("");
-      else setWithdrawAmount("");
+      if (res.status === "pending_approval") {
+        setNotice(`Routed to approver — four-eyes (approval #${res.approvalId})`);
+      } else {
+        setNotice(
+          "Deposited — principal sealed into a private StrategyPosition note and deployed to Privy Earn on Base",
+        );
+        setDepositAmount("");
+      }
+      setRefresh((n) => n + 1);
+    } catch (err) {
+      setError(cleanError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function redeem(cid: string) {
+    setError(null);
+    setNotice(null);
+    setBusy(cid);
+    try {
+      const res = await authedFetch(ringUrl, "/v1/strategies/earn/withdraw", { positionCid: cid });
+      if (res.status === "pending_approval") {
+        setNotice(`Routed to approver — four-eyes (approval #${res.approvalId})`);
+      } else if (res.status === "pending_redeem") {
+        setNotice("Privy Earn withdrawal completed; private note burn is pending retry");
+      } else {
+        setNotice(
+          "Redeemed — pulled from Privy Earn and the position note burned; principal returned to your desk as shielded cash",
+        );
+      }
       setRefresh((n) => n + 1);
     } catch (err) {
       setError(cleanError(err));
@@ -116,11 +162,22 @@ export default function StrategiesPage() {
               </p>
             ) : (
               <>
-                <div>
-                  <p className="text-xs text-ink-5">In vault</p>
-                  <p className="mt-1 text-3xl font-semibold tabular-nums text-ink">
-                    {fmtMicro(earn.position?.assetsInVault)}
-                  </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-ink-5">In vault</p>
+                    <p className="mt-1 text-3xl font-semibold tabular-nums text-ink">
+                      {fmtMicro(earn.position?.assetsInVault)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-5">Deployed · shielded principal</p>
+                    <p className="mt-1 text-3xl font-semibold tabular-nums text-ink">
+                      {fmtMicro(data.deployedMicro)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-ink-6">
+                      Held as a private note — the public chain sees a shielded transfer, not your Earn deposit.
+                    </p>
+                  </div>
                 </div>
 
                 <dl className="grid grid-cols-3 gap-3 text-sm">
@@ -146,9 +203,20 @@ export default function StrategiesPage() {
                   </div>
                 </dl>
 
+                <div>
+                  <label className="label" htmlFor="desk">Desk (cash source / destination)</label>
+                  <input
+                    id="desk"
+                    className="input w-full"
+                    placeholder="treasury"
+                    value={desk}
+                    onChange={(e) => setDesk(e.target.value)}
+                  />
+                </div>
+
                 <form
                   className="flex items-end gap-2"
-                  onSubmit={(e) => earnAction("deposit", e)}
+                  onSubmit={deposit}
                 >
                   <div className="flex-1">
                     <label className="label" htmlFor="deposit">
@@ -172,31 +240,36 @@ export default function StrategiesPage() {
                   </button>
                 </form>
 
-                <form
-                  className="flex items-end gap-2"
-                  onSubmit={(e) => earnAction("withdraw", e)}
-                >
-                  <div className="flex-1">
-                    <label className="label" htmlFor="withdraw">
-                      Withdraw (USDC)
-                    </label>
-                    <input
-                      id="withdraw"
-                      className="input w-full"
-                      placeholder="10000.00"
-                      inputMode="decimal"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn"
-                    disabled={busy !== null || !withdrawAmount.trim()}
-                  >
-                    {busy === "withdraw" ? "Submitting…" : "Withdraw"}
-                  </button>
-                </form>
+                <div>
+                  <div className="label">Open positions — redeem to unwind</div>
+                  {positions.length === 0 ? (
+                    <p className="text-[12px] text-ink-5">No open strategy positions.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {positions.map((p) => (
+                        <li
+                          key={p.cid}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-line-soft bg-ground px-3 py-2"
+                        >
+                          <span className="flex items-center gap-2">
+                            <HashChip value={p.cid} />
+                            <span className="tabular-nums text-[13px] text-ink">
+                              {fmtMicro(p.amount_micro)}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className="btn"
+                            disabled={busy !== null}
+                            onClick={() => redeem(p.cid)}
+                          >
+                            {busy === p.cid ? "Redeeming…" : "Redeem"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
 
                 {notice && <p className="text-sm text-gold-deep">{notice}</p>}
               </>

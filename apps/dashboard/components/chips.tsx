@@ -1,11 +1,11 @@
 "use client";
 
 // No hex anywhere user-facing by default (PLAN §6.2): cids/txids render as
-// short monospace chips — first 8 chars + … — that reveal on first click and
-// copy the full value on the second. Parties render as desk names: the org is
-// implied, so "UBS::treasury" reads as "Treasury"; ENS names stay full.
+// short monospace chips — first 8 chars + … — and never reveal/copy the full
+// value. Parties render as desk names: the org is implied, so "UBS::treasury"
+// reads as "Treasury"; ENS names stay full.
 
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { RingContext } from "@/lib/ring";
 
 const TX_RE = /^0x[0-9a-fA-F]{64}$/;
@@ -13,66 +13,45 @@ const TX_RE = /^0x[0-9a-fA-F]{64}$/;
 export function HashChip({
   value,
   className = "",
-  kind = "tx",
+  kind = "cid",
 }: {
   value?: string | null;
   className?: string;
-  /** "tx" → /tx/<hash>, "address" → /address/<hash> on the explorer (when configured). */
-  kind?: "tx" | "address";
+  /** "tx" → /tx/<hash>, "address" → /address/<hash> on the explorer (when configured).
+   *  "cid" (default) is a note commitment / contract id — NOT a transaction, so it never
+   *  links out (a commitment hash isn't queryable on Etherscan; /tx/<cid> would 404). */
+  kind?: "tx" | "address" | "cid";
 }) {
-  const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
   const explorer = useContext(RingContext)?.me.explorerBase ?? null;
 
   if (!value) return <span className="text-ink-6">—</span>;
-  // On a public chain (Sepolia), a tx hash links out to the block explorer — the data
-  // is genuinely live and verifiable. Locally there's no explorer, so no link.
-  const href = explorer && TX_RE.test(value) ? `${explorer}/${kind}/${value}` : null;
-
-  async function click() {
-    if (!revealed) {
-      setRevealed(true);
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(value!);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      // clipboard unavailable — the value is on screen anyway
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      className={`chip ${className}`}
-      onClick={click}
-      title={revealed ? "Click to copy" : "Click to reveal"}
-    >
-      {revealed ? (
-        <span className="break-all whitespace-normal">{value}</span>
-      ) : (
-        <>
-          {value.slice(0, 8)}
-          <span className="text-ink-6">…</span>
-        </>
-      )}
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="text-steel hover:underline"
-          title="View on Etherscan"
-        >
-          ↗
-        </a>
-      )}
-      {copied && <span className="text-gold">copied</span>}
-    </button>
+  // We never show the full value in the UI and never copy/expand it. On a public chain a tx
+  // hash / address links out to the block explorer (the only action); commitment ids (kind
+  // "cid") aren't transactions, and locally there's no explorer, so those render as static
+  // truncated text.
+  const href = explorer && kind !== "cid" && TX_RE.test(value) ? `${explorer}/${kind}/${value}` : null;
+  const short = (
+    <>
+      {value.slice(0, 8)}
+      <span className="text-ink-6">…</span>
+    </>
   );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className={`chip ${className}`}
+        title="View on Etherscan"
+      >
+        {short}
+        <span className="text-steel">↗</span>
+      </a>
+    );
+  }
+  return <span className={`chip ${className}`}>{short}</span>;
 }
 
 /** A settlement note: a human label followed by its tx hash as a linked chip
@@ -89,7 +68,7 @@ export function TxNote({
   return (
     <span className={`inline-flex flex-wrap items-center gap-1 ${className}`}>
       {label}
-      {txid ? <HashChip value={txid} /> : null}
+      {txid ? <HashChip value={txid} kind="tx" /> : null}
     </span>
   );
 }

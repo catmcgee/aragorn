@@ -10,14 +10,16 @@ const MAX_LINES = 200;
 // Audit log entries are loosely typed; pull a commitment/txid and a label
 // out of whatever shape the ring returns.
 type LogRow = Record<string, unknown>;
-const pick = (r: LogRow, ...keys: string[]): string | undefined => {
+type Picked = { key: string; value: string };
+const pick = (r: LogRow, ...keys: string[]): Picked | undefined => {
   for (const k of keys) {
     const v = r[k];
-    if (typeof v === "string" && v) return v;
-    if (typeof v === "number") return String(v);
+    if (typeof v === "string" && v) return { key: k, value: v };
+    if (typeof v === "number") return { key: k, value: String(v) };
   }
   return undefined;
 };
+const pickValue = (r: LogRow, ...keys: string[]): string | undefined => pick(r, ...keys)?.value;
 
 export default function AuditPage() {
   const { client, me, openPublic } = useRing();
@@ -86,7 +88,7 @@ export default function AuditPage() {
         {error && <p className="err">{error}</p>}
       </div>
 
-      {/* Commitment log — each row opens what the world sees on-chain. */}
+      {/* Commitment log — each row opens what the world sees onchain. */}
       {log && log.length > 0 && (
         <section>
           <div className="flex items-center gap-2.5 mb-2">
@@ -109,10 +111,11 @@ export default function AuditPage() {
               </thead>
               <tbody>
                 {log.map((row, i) => {
-                  const txid = pick(row, "txid", "tx", "commitment", "cid");
+                  const hash = pick(row, "txid", "tx", "commitment", "cid");
+                  const isTx = hash?.key === "txid" || hash?.key === "tx";
                   const kind =
-                    pick(row, "kind", "type", "event", "action") ?? "—";
-                  const ts = pick(row, "ts", "at", "created_at", "timestamp");
+                    pickValue(row, "kind", "type", "event", "action") ?? "—";
+                  const ts = pickValue(row, "ts", "at", "created_at", "timestamp");
                   return (
                     <tr
                       key={i}
@@ -120,7 +123,7 @@ export default function AuditPage() {
                     >
                       <td className="td">{kind}</td>
                       <td className="td">
-                        {txid ? <HashChip value={txid} /> : "—"}
+                        {hash ? <HashChip value={hash.value} kind={isTx ? "tx" : "cid"} /> : "—"}
                       </td>
                       <td className="td text-xs text-ink-4">
                         {ts
@@ -130,12 +133,16 @@ export default function AuditPage() {
                           : "—"}
                       </td>
                       <td className="td-num">
-                        <button
-                          className="public-pill"
-                          onClick={() => openPublic(txid)}
-                        >
-                          ⊙ Public
-                        </button>
+                        {isTx ? (
+                          <button
+                            className="public-pill"
+                            onClick={() => openPublic(hash.value)}
+                          >
+                            ⊙ Public
+                          </button>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                     </tr>
                   );

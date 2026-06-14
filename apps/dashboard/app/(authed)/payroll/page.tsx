@@ -290,7 +290,7 @@ export default function PayrollPage() {
             <p className="flex flex-wrap items-center gap-1 font-mono text-sm text-pos">
               {runResult.label}
               {runResult.txids.map((t) => (
-                <HashChip key={t} value={t} />
+                <HashChip key={t} value={t} kind="tx" />
               ))}
             </p>
           )}

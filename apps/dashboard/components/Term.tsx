@@ -1,7 +1,11 @@
 // Desk vocabulary with a hover glossary (PLAN §6: "speak desk, deliberately").
-// Dotted underline → one-line definition in 200ms. CSS only, no library.
+// Dotted underline → one-line definition. Rendered through a portal with viewport
+// clamping so the tooltip is never clipped by a scroll container or hidden behind
+// the sidebar (a pure-CSS ::after can't escape an `overflow` ancestor).
+"use client";
 
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 const GLOSSARY = {
   blotter: "The desk's running record of trades — every booking, live and closed.",
@@ -21,6 +25,10 @@ const GLOSSARY = {
 
 export type TermKey = keyof typeof GLOSSARY;
 
+// Half the tooltip's max width (17rem ≈ 272px) plus an 8px viewport margin — used to
+// clamp the centered tooltip so it never spills off the left or right edge.
+const EDGE_MARGIN = 144;
+
 export default function Term({
   t,
   children,
@@ -30,9 +38,38 @@ export default function Term({
   children?: ReactNode;
   className?: string;
 }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+  function show() {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const max = window.innerWidth - EDGE_MARGIN;
+    setPos({ x: Math.min(Math.max(r.left + r.width / 2, EDGE_MARGIN), max), y: r.top });
+  }
+  const hide = () => setPos(null);
+
   return (
-    <span className={`tip term ${className}`} data-tip={GLOSSARY[t]}>
-      {children ?? t}
-    </span>
+    <>
+      <span
+        ref={ref}
+        className={`term ${className}`}
+        tabIndex={0}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+      >
+        {children ?? t}
+      </span>
+      {pos &&
+        createPortal(
+          <span role="tooltip" className="term-tip" style={{ left: pos.x, top: pos.y - 8 }}>
+            {GLOSSARY[t]}
+          </span>,
+          document.body,
+        )}
+    </>
   );
 }

@@ -54,12 +54,16 @@ fn main(
     bond_issuer_x: Field, // carried from the dealer's disclosed bond data (PoC: not circuit-bound)
     maturity_ts: u64,     // set by lender at accept = now + days*86400 (dealer validates on decrypt)
     position_salt: Field,
+    position_secret: Field,
     agreement_salt: Field,
+    agreement_secret: Field,
     dealer_cash_salt: Field,
     dealer_cash_salt2: Field,
+    dealer_cash_secret: Field,
     change_amount: u64,
     change_salt: Field,
     change_salt2: Field,
+    change_secret: Field,
     // sorted stakeholder pair (dealer, lender)
     sh_lo: Field,
     sh_hi: Field,
@@ -75,22 +79,22 @@ fn main(
     let prop_ph = repo_proposal_payload(
         dealer_x, lender_x, isin_hash, face_amount, cash_amount, rate_bps, term_days,
     );
-    let proposal_c = commitment(TEMPLATE_REPO_PROPOSAL, prop_ph, pair_sh, proposal_salt);
+    let proposal_c = commitment(TEMPLATE_REPO_PROPOSAL, prop_ph, pair_sh, proposal_secret, proposal_salt);
     assert(merkle_root(proposal_c, proposal_index, proposal_path) == root);
     assert(nullifiers[0] == nullifier(proposal_c, proposal_secret));
 
     // n2: allocation tied to that proposal (authority-from-contract: the lender may consume
     // the dealer's locked collateral because the proposal's logic approves it)
     let alloc_ph = collateral_allocation_payload(dealer_x, proposal_c, isin_hash, face_amount);
-    let alloc_c = commitment(TEMPLATE_COLLATERAL_ALLOCATION, alloc_ph, pair_sh, allocation_salt);
+    let alloc_c = commitment(TEMPLATE_COLLATERAL_ALLOCATION, alloc_ph, pair_sh, allocation_secret, allocation_salt);
     assert(merkle_root(alloc_c, allocation_index, allocation_path) == root);
     assert(nullifiers[1] == nullifier(alloc_c, allocation_secret));
 
     // n3/n4: lender cash
-    let in1_c = cash_commitment(lender_x, in1_amount, in1_salt2, in1_salt);
+    let in1_c = cash_commitment(lender_x, in1_amount, in1_salt2, in1_secret, in1_salt);
     assert(merkle_root(in1_c, in1_index, in1_path) == root);
     assert(nullifiers[2] == nullifier(in1_c, in1_secret));
-    let in2_c = cash_commitment(lender_x, in2_amount, in2_salt2, in2_salt);
+    let in2_c = cash_commitment(lender_x, in2_amount, in2_salt2, in2_secret, in2_salt);
     if in2_real {
         assert(merkle_root(in2_c, in2_index, in2_path) == root);
         assert(nullifiers[3] == nullifier(in2_c, in2_secret));
@@ -104,18 +108,18 @@ fn main(
     let agr_ph = repo_agreement_payload(
         dealer_x, lender_x, alloc_c, cash_amount, rate_bps, term_days, maturity_ts,
     );
-    let agreement_c = commitment(TEMPLATE_REPO_AGREEMENT, agr_ph, pair_sh, agreement_salt);
+    let agreement_c = commitment(TEMPLATE_REPO_AGREEMENT, agr_ph, pair_sh, agreement_secret, agreement_salt);
     assert(commitments[1] == agreement_c);
 
     // c1: BondPosition -> lender, ENCUMBERED to the agreement (spendable only by exercising it)
     let pos_ph = bond_payload(lender_x, bond_issuer_x, isin_hash, face_amount, agreement_c);
-    assert(commitments[0] == commitment(TEMPLATE_BOND_POSITION, pos_ph, pair_sh, position_salt));
+    assert(commitments[0] == commitment(TEMPLATE_BOND_POSITION, pos_ph, pair_sh, position_secret, position_salt));
 
     // c3: cash to dealer == proposal.cash_amount exactly (a wrong number cannot verify)
-    assert(commitments[2] == cash_commitment(dealer_x, cash_amount, dealer_cash_salt2, dealer_cash_salt));
+    assert(commitments[2] == cash_commitment(dealer_x, cash_amount, dealer_cash_salt2, dealer_cash_secret, dealer_cash_salt));
 
     // c4: lender change
-    assert(commitments[3] == cash_commitment(lender_x, change_amount, change_salt2, change_salt));
+    assert(commitments[3] == cash_commitment(lender_x, change_amount, change_salt2, change_secret, change_salt));
     assert(in_sum == cash_amount + change_amount);
 
     // lender authorization over the whole transition

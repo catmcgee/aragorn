@@ -22,6 +22,10 @@ export interface Note {
   stakeholders: Field[];
 }
 
+export function nullifierKeyHash(noteSecret: Field): Field {
+  return poseidon2([assertField(noteSecret)]);
+}
+
 export function payloadHash(templateId: TemplateId, fields: PayloadFields): Field {
   const order = PAYLOAD_FIELDS[templateId];
   const inputs = order.map((name) => {
@@ -47,6 +51,7 @@ export function commitment(note: Note): Field {
     PROTOCOL_VERSION,
     payloadHash(note.templateId, note.fields),
     stakeholdersHash(note.stakeholders),
+    nullifierKeyHash(note.noteSecret),
     note.salt,
   ]);
 }

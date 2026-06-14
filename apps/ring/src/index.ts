@@ -31,7 +31,7 @@ const flows = new Flows(cfg, sql, chain, encKeys.publicKey, ens);
 
 // ENS v2 #3 — the Ring boots by reading its OWN name; ENS is the source of truth for
 // its public identity, config is the fallback. Secrets (enc priv, party keys) stay local;
-// what's on-chain (encpubkey, partyroot, modules) is verified against the local config.
+// what's onchain (encpubkey, partyroot, modules) is verified against the local config.
 const selfId = await ens.resolveSelf(cfg.ringEns);
 if (selfId) {
   const derivedEnc = `0x${Buffer.from(encKeys.publicKey).toString("hex")}`;

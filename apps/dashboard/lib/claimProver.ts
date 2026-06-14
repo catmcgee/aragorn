@@ -97,11 +97,13 @@ export function buildClaimWitness(data: ClaimData): ClaimWitness {
   const outOwnerX = poseidon2([claimSecret, 42n]);
   const outSalt = randomField();
   const outSalt2 = 0n;
+  const outSecret = randomField();
 
-  // c1 = commitment(Cash=1, version=1, payload, stakeholders, salt)
+  // c1 = commitment(Cash=1, version=1, payload, stakeholders, nf_key_hash, salt)
   const payloadHashCash = poseidon2([outOwnerX, amount, outSalt2]);
   const stakeholdersHash = poseidon2([outOwnerX, 0n, 0n, 0n]);
-  const c1 = poseidon2([1n, 1n, payloadHashCash, stakeholdersHash, outSalt]);
+  const nfKeyHash = poseidon2([outSecret]);
+  const c1 = poseidon2([1n, 1n, payloadHashCash, stakeholdersHash, nfKeyHash, outSalt]);
 
   const inputs: InputMap = {
     root: data.root,
@@ -120,6 +122,7 @@ export function buildClaimWitness(data: ClaimData): ClaimWitness {
     out_owner_x: fieldToHex(outOwnerX),
     out_salt: fieldToHex(outSalt),
     out_salt2: fieldToHex(outSalt2),
+    out_secret: fieldToHex(outSecret),
   };
 
   return { inputs, n1: fieldToHex(n1), c1: fieldToHex(c1) };

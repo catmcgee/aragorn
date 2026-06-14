@@ -55,10 +55,13 @@ fn main(
     // outputs
     lender_cash_salt: Field,
     lender_cash_salt2: Field,
+    lender_cash_secret: Field,
     position_out_salt: Field,
+    position_out_secret: Field,
     change_amount: u64,
     change_salt: Field,
     change_salt2: Field,
+    change_secret: Field,
     // sorted stakeholder pair
     sh_lo: Field,
     sh_hi: Field,
@@ -77,22 +80,22 @@ fn main(
     let agr_ph = repo_agreement_payload(
         dealer_x, lender_x, collateral_c, cash_amount, rate_bps, term_days, maturity_ts,
     );
-    let agreement_c = commitment(TEMPLATE_REPO_AGREEMENT, agr_ph, pair_sh, agreement_salt);
+    let agreement_c = commitment(TEMPLATE_REPO_AGREEMENT, agr_ph, pair_sh, agreement_secret, agreement_salt);
     assert(merkle_root(agreement_c, agreement_index, agreement_path) == root);
     assert(nullifiers[0] == nullifier(agreement_c, agreement_secret));
 
     // n2: encumbered position - its encumbrance field MUST equal the agreement being
     // exercised (authority-from-contract, the abstraction repo forces; EXPLORATION S6.1)
     let pos_ph = bond_payload(lender_x, bond_issuer_x, isin_hash, face_amount, agreement_c);
-    let pos_c = commitment(TEMPLATE_BOND_POSITION, pos_ph, pair_sh, position_salt);
+    let pos_c = commitment(TEMPLATE_BOND_POSITION, pos_ph, pair_sh, position_secret, position_salt);
     assert(merkle_root(pos_c, position_index, position_path) == root);
     assert(nullifiers[1] == nullifier(pos_c, position_secret));
 
     // n3/n4: dealer cash
-    let in1_c = cash_commitment(dealer_x, in1_amount, in1_salt2, in1_salt);
+    let in1_c = cash_commitment(dealer_x, in1_amount, in1_salt2, in1_secret, in1_salt);
     assert(merkle_root(in1_c, in1_index, in1_path) == root);
     assert(nullifiers[2] == nullifier(in1_c, in1_secret));
-    let in2_c = cash_commitment(dealer_x, in2_amount, in2_salt2, in2_salt);
+    let in2_c = cash_commitment(dealer_x, in2_amount, in2_salt2, in2_secret, in2_salt);
     if in2_real {
         assert(merkle_root(in2_c, in2_index, in2_path) == root);
         assert(nullifiers[3] == nullifier(in2_c, in2_secret));
@@ -104,14 +107,14 @@ fn main(
 
     // c1: repurchase price to the lender - computed IN-CIRCUIT; a wrong number cannot verify
     let repurchase = repurchase_amount(cash_amount, rate_bps, term_days);
-    assert(commitments[0] == cash_commitment(lender_x, repurchase, lender_cash_salt2, lender_cash_salt));
+    assert(commitments[0] == cash_commitment(lender_x, repurchase, lender_cash_salt2, lender_cash_secret, lender_cash_salt));
 
     // c2: collateral back to the dealer, unencumbered
     let pos_out_ph = bond_payload(dealer_x, bond_issuer_x, isin_hash, face_amount, 0);
-    assert(commitments[1] == commitment(TEMPLATE_BOND_POSITION, pos_out_ph, pair_sh, position_out_salt));
+    assert(commitments[1] == commitment(TEMPLATE_BOND_POSITION, pos_out_ph, pair_sh, position_out_secret, position_out_salt));
 
     // c3: dealer change
-    assert(commitments[2] == cash_commitment(dealer_x, change_amount, change_salt2, change_salt));
+    assert(commitments[2] == cash_commitment(dealer_x, change_amount, change_salt2, change_secret, change_salt));
     assert(in_sum == repurchase + change_amount);
 
     // dealer authorization

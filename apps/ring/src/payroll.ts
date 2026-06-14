@@ -109,9 +109,11 @@ export class Payroll {
         ent_amount: pad3(items.map((i) => i.amountMicro.toString()), "0"),
         ent_memo_hash: pad3(items.map(() => fieldToHex(memoHash)), "0"),
         ent_salt: pad3(items.map((i) => fieldToHex(i.note.salt)), "0"),
+        ent_secret: pad3(items.map((i) => fieldToHex(i.note.noteSecret)), "0"),
         change_amount: change.toString(),
         change_salt: fieldToHex(changeNote.salt),
         change_salt2: fieldToHex(changeNote.fields.salt2),
+        change_secret: fieldToHex(changeNote.noteSecret),
       });
 
       const cts = [
@@ -136,13 +138,17 @@ export class Payroll {
   }
 
   /** Everything an employee's device needs to prove the claim locally (witness inputs). */
-  async claimData(employeeId: number): Promise<Record<string, unknown>> {
+  async claimData(userEmail: string, employeeId: number): Promise<Record<string, unknown>> {
+    const [employee] = await this.sql`
+      SELECT e.id FROM employees e JOIN users u ON u.id = e.user_id
+      WHERE e.id = ${employeeId} AND u.email = ${userEmail}`;
+    if (!employee) throw Object.assign(new Error("forbidden for employee"), { status: 403 });
     const [item] = await this.sql`
       SELECT p.*, e.subname_label FROM payroll_items p JOIN employees e ON e.id = p.employee_id
       WHERE p.employee_id = ${employeeId} AND p.status = 'claimable' ORDER BY p.id DESC LIMIT 1`;
     if (!item) throw new Error("no claimable entitlement");
     const [note] = await this.sql`SELECT * FROM notes WHERE cid = ${item.entitlement_cid}`;
-    if (!note || note.status !== "active") throw new Error("entitlement not active on-chain yet");
+    if (!note || note.status !== "active") throw new Error("entitlement not active onchain yet");
 
     return {
       entitlementCid: item.entitlement_cid,
@@ -159,8 +165,8 @@ export class Payroll {
   }
 
   /** Server-proved claim (P4 path; browser proving arrives in P5). */
-  async claim(employeeId: number): Promise<{ txid: string; cid: string }> {
-    const data = await this.claimData(employeeId);
+  async claim(userEmail: string, employeeId: number): Promise<{ txid: string; cid: string }> {
+    const data = await this.claimData(userEmail, employeeId);
     // employee key: deterministic per employee for the PoC (their device would hold this)
     const employeeKeys = derivePartyKeys(hexToField(data.claimSecret as string));
     const outNote = newNote(
@@ -190,6 +196,7 @@ export class Payroll {
       out_owner_x: fieldToHex(employeeKeys.x),
       out_salt: fieldToHex(outNote.salt),
       out_salt2: fieldToHex(outNote.fields.salt2),
+      out_secret: fieldToHex(outNote.noteSecret),
     } as any);
 
     const txid = await this.flows.settleRaw(
@@ -197,18 +204,27 @@ export class Payroll {
       bundle,
       encryptNoteFor([this.orgEncPub], outNote),
     );
-    await this.sql`UPDATE payroll_items SET status = 'claimed' WHERE entitlement_cid = ${data.entitlementCid}`;
+    await this.sql`UPDATE payroll_items SET status = 'claimed' WHERE entitlement_cid = ${String(data.entitlementCid)}`;
     return { txid, cid: fieldToHex(c1) };
   }
 
   /** Relay a browser-generated claim proof (P5: the witness never left the device). */
-  async submitClaim(proofHex: string, publicInputs: string[]): Promise<{ txid: string }> {
+  async submitClaim(userEmail: string, proofHex: string, publicInputs: string[]): Promise<{ txid: string }> {
+    const n1 = publicInputs[2];
+    const [item] = await this.sql`
+      SELECT p.id FROM payroll_items p
+      JOIN employees e ON e.id = p.employee_id
+      JOIN users u ON u.id = e.user_id
+      JOIN notes n ON n.cid = p.entitlement_cid
+      WHERE u.email = ${userEmail}
+        AND p.status = 'claimable'
+        AND n.expected_nullifier = ${n1}`;
+    if (!item) throw Object.assign(new Error("no claimable entitlement for user"), { status: 403 });
     const txid = await this.flows.settleRaw(
       CircuitId.entitlement_claim,
       { proof: Buffer.from(proofHex.replace("0x", ""), "hex"), publicInputs },
       [],
     );
-    const n1 = publicInputs[2];
     await this.sql`
       UPDATE payroll_items SET status = 'claimed'
       WHERE entitlement_cid IN (SELECT cid FROM notes WHERE expected_nullifier = ${n1})`;

@@ -25,6 +25,12 @@ export class EarnService {
     return !!(this.appId && this.walletId && this.vaultId);
   }
 
+  /** Stable identifier for the Earn vault — hashed into the StrategyPosition note so the
+   *  position records which vault it represents. */
+  get vaultLabel(): string {
+    return this.vaultId ?? "privy-earn";
+  }
+
   private async call(method: string, path: string, body?: unknown): Promise<any> {
     const res = await fetch(`${PRIVY_API}${path}`, {
       method,

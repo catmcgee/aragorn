@@ -38,8 +38,9 @@ async function main() {
   const claimHash = poseidon2([claimSecret]);
   const payloadHash = poseidon2([claimHash, amount, payerX, memoHash]);
   const stakeholders = poseidon2([payerX, 0n, 0n, 0n]);
-  // commitment(TEMPLATE_ENTITLEMENT=6, VERSION=1, payload, stakeholders, salt)
-  const entC = poseidon2([6n, 1n, payloadHash, stakeholders, salt]);
+  const nfKeyHash = poseidon2([noteSecret]);
+  // commitment(TEMPLATE_ENTITLEMENT=6, VERSION=1, payload, stakeholders, nf_key_hash, salt)
+  const entC = poseidon2([6n, 1n, payloadHash, stakeholders, nfKeyHash, salt]);
 
   // 1-leaf tree: siblings are the zero-subtree chain z0=0, z_{i+1}=H(z_i, z_i)
   const path: bigint[] = [];

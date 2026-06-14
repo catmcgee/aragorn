@@ -35,7 +35,7 @@ function env(name: string): string {
 const RPC = env("SEPOLIA_RPC_URL");
 const KEY = env("SEPOLIA_DEPLOYER_KEY") as `0x${string}`;
 
-// ENSv2 Sepolia addresses (verified on-chain 2026-06-12)
+// ENSv2 Sepolia addresses (verified onchain 2026-06-12)
 const ETH_REGISTRY = "0xDEDB92913A25abE1f7BCDD85D8A344a43B398B67" as const; // v2 PermissionedRegistry for .eth
 const REGISTRAR = "0x8c2E866B439358c41AE05De9cbE8A00BFEFafFcA" as const; // ETHRegistrar (commit-reveal)
 const PAYMENT_TOKEN = "0x3DfC8b53dAFa5eBbb071a8B97678Ab534Ed838D9" as const; // MockERC20, free public mint
