@@ -176,35 +176,33 @@ app.post("/provision", async (c) => {
     const sepoliaRpc = process.env.SEPOLIA_RPC_URL;
 
     // ── create the ring's Postgres database (idempotent) ──
+    // One path for hosted and local: connect to the admin DB over TCP via the postgres client
+    // and CREATE DATABASE. No `docker exec`, so it works whether Postgres runs in Docker or
+    // natively — and fails with a clear message if it simply isn't reachable. Admin URL is
+    // PROVISION_DATABASE_URL (hosted) or LOCAL_ADMIN_DATABASE_URL / the 5434 default (local).
     const ringDbName = `ring_${slug}`;
-    let ringDbUrl: string;
-    if (PROVISION_DB) {
-      // hosted: CREATE DATABASE on the shared Postgres via a connection (no docker in-container)
-      const adminUrl = new URL(PROVISION_DB);
-      adminUrl.pathname = "/postgres";
-      const admin = postgres(adminUrl.toString(), { max: 1 });
-      try {
-        await admin.unsafe(`CREATE DATABASE "${ringDbName}"`);
-      } catch (e: any) {
-        if (!/already exists/i.test(String(e?.message))) throw e;
-      } finally {
-        await admin.end();
+    const baseDbUrl =
+      PROVISION_DB ??
+      process.env.LOCAL_ADMIN_DATABASE_URL ??
+      "postgres://aragorn:aragorn@127.0.0.1:5434/postgres";
+    const adminUrl = new URL(baseDbUrl);
+    adminUrl.pathname = "/postgres";
+    const admin = postgres(adminUrl.toString(), { max: 1, connect_timeout: 8 });
+    try {
+      await admin.unsafe(`CREATE DATABASE "${ringDbName}"`);
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      if (!/already exists/i.test(msg)) {
+        throw new Error(
+          `db create failed (is Postgres reachable at ${adminUrl.host}? start it, or set PROVISION_DATABASE_URL / LOCAL_ADMIN_DATABASE_URL): ${msg}`,
+        );
       }
-      const ringUrlObj = new URL(PROVISION_DB);
-      ringUrlObj.pathname = `/${ringDbName}`;
-      ringDbUrl = ringUrlObj.toString();
-    } else {
-      // local: docker postgres
-      const created = Bun.spawnSync([
-        "docker", "exec", "aragorn-postgres", "psql", "-U", "aragorn", "-d", "postgres", "-q", "-c",
-        `CREATE DATABASE ${ringDbName}`,
-      ]);
-      if (created.exitCode !== 0) {
-        const err = created.stderr.toString();
-        if (!/already exists/i.test(err)) throw new Error(`db create failed: ${err.trim()}`);
-      }
-      ringDbUrl = `postgres://aragorn:aragorn@127.0.0.1:5434/${ringDbName}`;
+    } finally {
+      await admin.end();
     }
+    const ringUrlObj = new URL(baseDbUrl);
+    ringUrlObj.pathname = `/${ringDbName}`;
+    const ringDbUrl = ringUrlObj.toString();
 
     // ── ENS: publish the org's resolution metadata on the PermissionedResolver ──
     if (sepoliaRpc) {
