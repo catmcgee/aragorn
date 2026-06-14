@@ -190,7 +190,7 @@ export default function RepoPage() {
   async function accept(id: number) {
     setBusyId(id);
     try {
-      const res = await authedFetch(ringUrl, `/v1/repos/${id}/accept`);
+      const res = await authedFetch(ringUrl, `/v1/repos/${id}/accept`, {});
       setOutcomes((o) => ({ ...o, [id]: { label: "Settled — tx", txid: String(res.txid) } }));
       setRefresh((n) => n + 1);
     } catch (e) {
@@ -203,7 +203,7 @@ export default function RepoPage() {
   async function close(id: number) {
     setBusyId(id);
     try {
-      const res = await authedFetch(ringUrl, `/v1/repos/${id}/close`);
+      const res = await authedFetch(ringUrl, `/v1/repos/${id}/close`, {});
       setOutcomes((o) => ({
         ...o,
         [id]: {
