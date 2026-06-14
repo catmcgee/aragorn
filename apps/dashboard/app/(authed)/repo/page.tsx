@@ -95,7 +95,7 @@ function bondFace(c: ContractRow): string {
 }
 
 export default function RepoPage() {
-  const { client, ringUrl, tick, openPublic } = useRing();
+  const { client, me, ringUrl, tick, openPublic } = useRing();
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [bonds, setBonds] = useState<ContractRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -107,8 +107,9 @@ export default function RepoPage() {
   const [dealerParty, setDealerParty] = useState("trading");
   // counterparty defaults to the first whitelisted name (set in the effect below), not a hardcode
   const [counterpartyEns, setCounterpartyEns] = useState("");
-  const [cash, setCash] = useState("");
-  const [rateBps, setRateBps] = useState("");
+  // Demo-ready defaults: $4M overnight at 5.3% (against the seeded UST 2Y, $5M face).
+  const [cash, setCash] = useState("4000000");
+  const [rateBps, setRateBps] = useState("530");
   const [days, setDays] = useState("1");
   const [booking, setBooking] = useState(false);
   const [bookResult, setBookResult] = useState<{ label: string; txid?: string } | null>(null);
@@ -134,13 +135,18 @@ export default function RepoPage() {
         );
       })
       .catch((e) => live && setError(cleanError(e)));
-    // default the counterparty to the first whitelisted ring (unless the user has typed one)
+    // default the counterparty to the first whitelisted ring that ISN'T us (the org may be
+    // self-whitelisted for desk-ENS resolution) — a repo is with another institution.
     authedFetch(ringUrl, "/v1/whitelist")
       .then((r) => {
         if (!live) return;
-        const rows = (Array.isArray(r) ? r : (r.whitelist ?? r.rows ?? [])) as Array<{ ens_name?: string }>;
-        const first = rows[0]?.ens_name;
-        if (first) setCounterpartyEns((cur) => cur || first);
+        const rows = (Array.isArray(r) ? r : (r.whitelist ?? r.rows ?? [])) as Array<{
+          ensName?: string;
+          ens_name?: string;
+        }>;
+        const names = rows.map((x) => x.ensName ?? x.ens_name).filter(Boolean) as string[];
+        const counterparty = names.find((n) => n !== me.ens) ?? names[0];
+        if (counterparty) setCounterpartyEns((cur) => cur || counterparty);
       })
       .catch(() => {});
     return () => {
