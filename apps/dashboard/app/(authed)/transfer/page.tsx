@@ -16,8 +16,9 @@ export default function TransferPage() {
   const [parties, setParties] = useState<string[]>([]);
   const [fromSelect, setFromSelect] = useState<string>(CUSTOM);
   const [fromCustom, setFromCustom] = useState("");
-  const [to, setTo] = useState("");
-  const [amount, setAmount] = useState("");
+  // Demo-ready defaults: treasury → the trading desk addressed by ENS subname.
+  const [to, setTo] = useState("trading.jpmorgan.aragornrings.eth");
+  const [amount, setAmount] = useState("250000");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TransferResult | null>(null);
@@ -30,7 +31,10 @@ export default function TransferPage() {
         if (!live) return;
         const keys = Object.keys(p.balances);
         setParties(keys);
-        setFromSelect((cur) => (cur === CUSTOM && keys.length > 0 ? keys[0] : cur));
+        // Default From to treasury when present (it holds the cash), else the first desk.
+        setFromSelect((cur) =>
+          cur === CUSTOM && keys.length > 0 ? (keys.includes("treasury") ? "treasury" : keys[0]) : cur,
+        );
       })
       .catch(() => {});
     return () => {
